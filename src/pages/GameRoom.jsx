@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
@@ -24,6 +24,89 @@ const GameRoom = () => {
     timers, isMyTurn, moveHistory, captured,
     makeMove, sendEmoji, resign, requestRematch, acceptRematch
   } = useChessGame(roomCode, profile);
+
+  // Memoize chessboard props to prevent re-render cancellations
+  const customDarkSquareStyle = useMemo(() => ({ backgroundColor: 'var(--board-dark)' }), []);
+  const customLightSquareStyle = useMemo(() => ({ backgroundColor: 'var(--board-light)' }), []);
+
+  function getMoveOptions(square) {
+    const moves = game.moves({ square, verbose: true });
+    if (moves.length === 0) {
+      setOptionSquares({});
+      return false;
+    }
+
+    const newSquares = {};
+    moves.forEach((move) => {
+      newSquares[move.to] = {
+        background:
+          game.get(move.to) && game.get(move.to).color !== game.get(square).color
+            ? 'radial-gradient(circle, rgba(168, 85, 247, .4) 85%, transparent 85%)'
+            : 'radial-gradient(circle, rgba(168, 85, 247, .4) 20%, transparent 20%)',
+        borderRadius: '50%',
+      };
+    });
+    newSquares[square] = { background: 'rgba(168, 85, 247, 0.4)' };
+    setOptionSquares(newSquares);
+    return true;
+  }
+
+  const handleSquareClick = useCallback((square) => {
+    // If no piece is selected yet, try to select one
+    if (!moveFrom) {
+      const piece = game.get(square);
+      if (piece && piece.color === playerColor && isMyTurn) {
+        setMoveFrom(square);
+        getMoveOptions(square);
+      }
+      return;
+    }
+
+    // A piece is already selected — try to move to the clicked square
+    try {
+      const testGame = new Chess(game.fen());
+      const result = testGame.move({ from: moveFrom, to: square, promotion: 'q' });
+      
+      if (result) {
+        // Valid move — execute it
+        makeMove({ from: moveFrom, to: square, promotion: 'q' });
+        setMoveFrom('');
+        setOptionSquares({});
+        return;
+      }
+    } catch (e) {
+      // Invalid move — fall through
+    }
+
+    // Invalid move — check if clicking a different own piece
+    const piece = game.get(square);
+    if (piece && piece.color === playerColor && isMyTurn) {
+      setMoveFrom(square);
+      getMoveOptions(square);
+    } else {
+      setMoveFrom('');
+      setOptionSquares({});
+    }
+  }, [moveFrom, game, playerColor, isMyTurn, makeMove]);
+
+  const handlePieceDrop = useCallback((sourceSquare, targetSquare) => {
+    if (playerColor !== game.turn()) return false;
+
+    try {
+      const testGame = new Chess(game.fen());
+      const result = testGame.move({ from: sourceSquare, to: targetSquare, promotion: 'q' });
+      
+      if (result) {
+        makeMove({ from: sourceSquare, to: targetSquare, promotion: 'q' });
+        setMoveFrom('');
+        setOptionSquares({});
+        return true;
+      }
+    } catch (e) {
+      // Invalid move
+    }
+    return false;
+  }, [playerColor, game, makeMove]);
 
   // Debug logging
   useEffect(() => {
@@ -83,87 +166,6 @@ const GameRoom = () => {
       </div>
     </div>
   );
-
-  // --- Chess interaction functions (simple, no refs, no memoization) ---
-
-  function getMoveOptions(square) {
-    const moves = game.moves({ square, verbose: true });
-    if (moves.length === 0) {
-      setOptionSquares({});
-      return false;
-    }
-
-    const newSquares = {};
-    moves.forEach((move) => {
-      newSquares[move.to] = {
-        background:
-          game.get(move.to) && game.get(move.to).color !== game.get(square).color
-            ? 'radial-gradient(circle, rgba(168, 85, 247, .4) 85%, transparent 85%)'
-            : 'radial-gradient(circle, rgba(168, 85, 247, .4) 20%, transparent 20%)',
-        borderRadius: '50%',
-      };
-    });
-    newSquares[square] = { background: 'rgba(168, 85, 247, 0.4)' };
-    setOptionSquares(newSquares);
-    return true;
-  }
-
-  function handleSquareClick(square) {
-    // If no piece is selected yet, try to select one
-    if (!moveFrom) {
-      const piece = game.get(square);
-      if (piece && piece.color === playerColor && isMyTurn) {
-        setMoveFrom(square);
-        getMoveOptions(square);
-      }
-      return;
-    }
-
-    // A piece is already selected — try to move to the clicked square
-    try {
-      const testGame = new Chess(game.fen());
-      const result = testGame.move({ from: moveFrom, to: square, promotion: 'q' });
-      
-      if (result) {
-        // Valid move — execute it
-        makeMove({ from: moveFrom, to: square, promotion: 'q' });
-        setMoveFrom('');
-        setOptionSquares({});
-        return;
-      }
-    } catch (e) {
-      // Invalid move — fall through
-    }
-
-    // Invalid move — check if clicking a different own piece
-    const piece = game.get(square);
-    if (piece && piece.color === playerColor && isMyTurn) {
-      setMoveFrom(square);
-      getMoveOptions(square);
-    } else {
-      setMoveFrom('');
-      setOptionSquares({});
-    }
-  }
-
-  function handlePieceDrop(sourceSquare, targetSquare) {
-    if (playerColor !== game.turn()) return false;
-
-    try {
-      const testGame = new Chess(game.fen());
-      const result = testGame.move({ from: sourceSquare, to: targetSquare, promotion: 'q' });
-      
-      if (result) {
-        makeMove({ from: sourceSquare, to: targetSquare, promotion: 'q' });
-        setMoveFrom('');
-        setOptionSquares({});
-        return true;
-      }
-    } catch (e) {
-      // Invalid move
-    }
-    return false;
-  }
 
   const copyRoomCode = () => {
     navigator.clipboard.writeText(roomCode);
