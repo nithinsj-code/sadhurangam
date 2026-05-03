@@ -234,6 +234,21 @@ const GameRoom = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handlePieceDrop = useCallback((source, target) => {
+    return onPieceDrop(source, target);
+  }, []);
+
+  const handleSquareClick = useCallback((square) => {
+    return onSquareClick(square);
+  }, []);
+
+  const customDarkSquareStyle = useMemo(() => ({ backgroundColor: 'var(--board-dark)' }), []);
+  const customLightSquareStyle = useMemo(() => ({ backgroundColor: 'var(--board-light)' }), []);
+  const mergedSquareStyles = useMemo(() => ({
+    ...optionSquares,
+    ...rightClickedSquares,
+  }), [optionSquares, rightClickedSquares]);
+
   return (
     <div className="game-container animate-fade">
       <div className="game-layout">
@@ -253,16 +268,13 @@ const GameRoom = () => {
               <Chessboard 
                 id="main-board"
                 position={game.fen()} 
-                onPieceDrop={onPieceDrop}
-                onSquareClick={onSquareClick}
+                onPieceDrop={handlePieceDrop}
+                onSquareClick={handleSquareClick}
                 boardOrientation={playerColor === 'b' ? 'black' : 'white'}
                 arePiecesDraggable={true}
-                customDarkSquareStyle={{ backgroundColor: 'var(--board-dark)' }}
-                customLightSquareStyle={{ backgroundColor: 'var(--board-light)' }}
-                customSquareStyles={{
-                  ...optionSquares,
-                  ...rightClickedSquares,
-                }}
+                customDarkSquareStyle={customDarkSquareStyle}
+                customLightSquareStyle={customLightSquareStyle}
+                customSquareStyles={mergedSquareStyles}
                 animationDuration={200}
               />
             )}
