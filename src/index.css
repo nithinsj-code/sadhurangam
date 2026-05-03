@@ -216,7 +216,7 @@ h1, h2, h3, h4 {
   flex-direction: column; 
   height: calc(100vh - 70px); 
   padding: 10px; 
-  overflow: hidden; 
+  overflow-y: auto; 
 }
 .game-layout { 
   display: grid; 
@@ -228,13 +228,13 @@ h1, h2, h3, h4 {
 .board-section { 
   display: flex; 
   flex-direction: column; 
-  gap: 8px; 
-  height: 100%; 
+  gap: 10px; 
   justify-content: center; 
   align-items: center;
+  padding: 10px 0;
 }
 .chessboard-wrapper { 
-  width: min(65vh, 100%); 
+  width: min(58vh, 100%); 
   aspect-ratio: 1; 
   padding: 8px; 
   position: relative; 
@@ -248,7 +248,7 @@ h1, h2, h3, h4 {
   justify-content: space-between; 
   align-items: center; 
   padding: 8px 16px; 
-  width: min(65vh, 100%);
+  width: min(58vh, 100%);
 }
 .active-turn { border: 2px solid var(--primary); box-shadow: 0 0 15px var(--primary-glow); }
 .timer { font-family: 'Outfit', sans-serif; font-size: 24px; font-weight: 700; padding: 8px 16px; }
