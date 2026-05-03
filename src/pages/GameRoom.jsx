@@ -196,31 +196,35 @@ const GameRoom = () => {
           />
 
           <div 
-            className="chessboard-wrapper nm-card"
-            onClick={() => console.log('Board Wrapper Clicked!')}
-            style={{ border: '2px solid red' }}
+            id="board-test-wrapper"
+            onClick={(e) => {
+              console.log('Wrapper Click Details:', {
+                target: e.target.tagName,
+                className: e.target.className,
+                clientX: e.clientX,
+                clientY: e.clientY
+              });
+            }}
+            style={{ 
+              border: '4px solid green', 
+              padding: '10px', 
+              background: 'rgba(0,255,0,0.1)',
+              pointerEvents: 'auto'
+            }}
           >
-            {emojiMessage && (
-              <div className="emoji-popup animate-bounce">
-                {emojiMessage.emoji}
-              </div>
-            )}
             {game && (
               <Chessboard 
+                id="main-board"
                 position={game.fen()} 
                 onPieceDrop={onPieceDrop}
                 onSquareClick={(square) => {
-                  console.log('CHESSBOARD SQUARED CLICKED:', square);
+                  console.log('INTERNAL BOARD CLICK:', square);
                   onSquareClick(square);
                 }}
-                onPieceClick={(piece) => {
-                  console.log('CHESSBOARD PIECE CLICKED:', piece);
-                }}
                 boardOrientation={playerColor === 'b' ? 'black' : 'white'}
-                arePiecesDraggable={false}
+                arePiecesDraggable={true}
                 customDarkSquareStyle={{ backgroundColor: 'var(--board-dark)' }}
                 customLightSquareStyle={{ backgroundColor: 'var(--board-light)' }}
-                customDropSquareStyle={{ boxShadow: 'inset 0 0 1px 6px rgba(168, 85, 247, 0.75)' }}
                 customSquareStyles={{
                   ...optionSquares,
                   ...rightClickedSquares,
