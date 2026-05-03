@@ -16,6 +16,9 @@ const GameRoom = () => {
   const navigate = useNavigate();
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [emojiMessage, setEmojiMessage] = useState(null);
+  const [moveFrom, setMoveFrom] = useState('');
+  const [rightClickedSquares, setRightClickedSquares] = useState({});
+  const [optionSquares, setOptionSquares] = useState({});
 
   const {
     game, room, loading, error, playerColor, 
@@ -82,14 +85,87 @@ const GameRoom = () => {
     </div>
   );
 
-  const onDrop = (sourceSquare, targetSquare) => {
+  function getMoveOptions(square) {
+    const moves = game.moves({
+      square,
+      verbose: true,
+    });
+    if (moves.length === 0) {
+      setOptionSquares({});
+      return false;
+    }
+
+    const newSquares = {};
+    moves.map((move) => {
+      newSquares[move.to] = {
+        background:
+          game.get(move.to) && game.get(move.to).color !== game.get(square).color
+            ? 'radial-gradient(circle, rgba(0,0,0,.1) 85%, transparent 85%)'
+            : 'radial-gradient(circle, rgba(0,0,0,.1) 20%, transparent 20%)',
+        borderRadius: '50%',
+      };
+      return move;
+    });
+    newSquares[square] = {
+      background: 'rgba(255, 255, 0, 0.4)',
+    };
+    setOptionSquares(newSquares);
+    return true;
+  }
+
+  function onSquareClick(square) {
+    // alert('Click: ' + square); // Temporary check
+    console.log('Square Click:', square, { moveFrom, playerColor, isMyTurn });
+    setRightClickedSquares({});
+
+    // from square
+    if (!moveFrom) {
+      const piece = game.get(square);
+      console.log('Piece at square:', piece);
+      // Allow selecting if it's your turn AND it's your piece
+      if (piece && piece.color === playerColor && isMyTurn) {
+        setMoveFrom(square);
+        getMoveOptions(square);
+      }
+      return;
+    }
+
+    // to square
+    const move = makeMove({
+      from: moveFrom,
+      to: square,
+      promotion: 'q', // always promote to queen for simplicity
+    });
+
+    // if invalid, check if we're just picking another of our pieces
+    if (!move) {
+      const piece = game.get(square);
+      if (piece && piece.color === playerColor && isMyTurn) {
+        setMoveFrom(square);
+        getMoveOptions(square);
+      } else {
+        setMoveFrom('');
+        setOptionSquares({});
+      }
+      return;
+    }
+
+    setMoveFrom('');
+    setOptionSquares({});
+  }
+
+  function onPieceDrop(sourceSquare, targetSquare) {
     const move = makeMove({
       from: sourceSquare,
       to: targetSquare,
-      promotion: 'q', // always promote to queen for simplicity
+      promotion: 'q',
     });
+    if (move) {
+      setMoveFrom('');
+      setOptionSquares({});
+    }
     return move;
-  };
+  }
 
   const copyRoomCode = () => {
     navigator.clipboard.writeText(roomCode);
@@ -125,11 +201,16 @@ const GameRoom = () => {
             {game && (
               <Chessboard 
                 position={game.fen()} 
-                onPieceDrop={onDrop}
+                onPieceDrop={onPieceDrop}
+                onSquareClick={onSquareClick}
                 boardOrientation={playerColor === 'b' ? 'black' : 'white'}
                 customDarkSquareStyle={{ backgroundColor: 'var(--board-dark)' }}
                 customLightSquareStyle={{ backgroundColor: 'var(--board-light)' }}
                 customDropSquareStyle={{ boxShadow: 'inset 0 0 1px 6px rgba(168, 85, 247, 0.75)' }}
+                customSquareStyles={{
+                  ...optionSquares,
+                  ...rightClickedSquares,
+                }}
                 animationDuration={200}
               />
             )}
@@ -252,7 +333,13 @@ const PlayerBar = ({ player, time, isTurn, captured, color, isSelf }) => {
       <div className="flex items-center gap-3">
         <div className="player-avatar nm-inset">{player?.avatar_initials || '??'}</div>
         <div className="player-info">
-          <span className="player-name">{player?.display_name || 'Searching...'}</span>
+          <div className="flex items-center gap-2">
+            <span className="player-name">{player?.display_name || 'Searching...'}</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded border ${color === 'white' ? 'bg-white text-black border-gray-300' : 'bg-black text-white border-gray-700'}`}>
+              {color.toUpperCase()}
+            </span>
+            {isSelf && <span className="text-[10px] text-primary">(You)</span>}
+          </div>
           <div className="captured-row">
             {captured?.map((p, i) => (
               <span key={i} className="captured-piece">{getPieceIcon(p, color === 'white' ? 'b' : 'w')}</span>

@@ -164,8 +164,12 @@ export const useChessGame = (roomCode, userProfile) => {
   };
 
   const makeMove = async (move) => {
+    console.log('makeMove called:', move, { playerColor, turn: game.turn(), status: room?.status });
     if (room.status === 'finished') return false;
-    if (playerColor !== game.turn()) return false;
+    if (playerColor !== game.turn()) {
+      console.log('Not your turn!');
+      return false;
+    }
 
     try {
       const gameCopy = new Chess(game.fen());
