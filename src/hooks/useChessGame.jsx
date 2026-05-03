@@ -82,11 +82,24 @@ export const useChessGame = (roomCode, userProfile) => {
   }, [room?.status, game.fen()]);
 
   useEffect(() => {
-    if (!room || !userProfile) return;
+    if (!room || !userProfile) {
+      console.log('Waiting for room or userProfile...', { room: !!room, userProfile: !!userProfile });
+      return;
+    }
     
-    if (room.white_player_id === userProfile.id) setPlayerColor('w');
-    else if (room.black_player_id === userProfile.id) setPlayerColor('b');
-    else setPlayerColor(null); // Spectator
+    console.log('Room IDs:', { white: room.white_player_id, black: room.black_player_id });
+    console.log('User ID:', userProfile.id);
+
+    if (room.white_player_id === userProfile.id) {
+      console.log('Setting player color to WHITE');
+      setPlayerColor('w');
+    } else if (room.black_player_id === userProfile.id) {
+      console.log('Setting player color to BLACK');
+      setPlayerColor('b');
+    } else {
+      console.log('Setting player color to NULL (Spectator)');
+      setPlayerColor(null);
+    }
 
     setIsMyTurn(game.turn() === (room.white_player_id === userProfile.id ? 'w' : 'b'));
   }, [room, game.fen(), userProfile]);

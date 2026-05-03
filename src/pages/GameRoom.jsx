@@ -100,14 +100,14 @@ const GameRoom = () => {
       newSquares[move.to] = {
         background:
           game.get(move.to) && game.get(move.to).color !== game.get(square).color
-            ? 'radial-gradient(circle, rgba(0,0,0,.1) 85%, transparent 85%)'
-            : 'radial-gradient(circle, rgba(0,0,0,.1) 20%, transparent 20%)',
+            ? 'radial-gradient(circle, rgba(168, 85, 247, .4) 85%, transparent 85%)'
+            : 'radial-gradient(circle, rgba(168, 85, 247, .4) 20%, transparent 20%)',
         borderRadius: '50%',
       };
       return move;
     });
     newSquares[square] = {
-      background: 'rgba(255, 255, 0, 0.4)',
+      background: 'rgba(168, 85, 247, 0.2)',
     };
     setOptionSquares(newSquares);
     return true;
@@ -204,6 +204,7 @@ const GameRoom = () => {
                 onPieceDrop={onPieceDrop}
                 onSquareClick={onSquareClick}
                 boardOrientation={playerColor === 'b' ? 'black' : 'white'}
+                arePiecesDraggable={true}
                 customDarkSquareStyle={{ backgroundColor: 'var(--board-dark)' }}
                 customLightSquareStyle={{ backgroundColor: 'var(--board-light)' }}
                 customDropSquareStyle={{ boxShadow: 'inset 0 0 1px 6px rgba(168, 85, 247, 0.75)' }}
