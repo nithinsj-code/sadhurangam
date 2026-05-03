@@ -27,6 +27,10 @@ const GameRoom = () => {
   } = useChessGame(roomCode, profile);
 
   useEffect(() => {
+    console.log('GameRoom State Update:', { playerColor, isMyTurn, turn: game.turn(), status: room?.status });
+  }, [playerColor, isMyTurn, game.fen(), room?.status]);
+
+  useEffect(() => {
     const handleEmoji = (e) => {
       setEmojiMessage(e.detail);
       setTimeout(() => setEmojiMessage(null), 3000);
@@ -130,15 +134,17 @@ const GameRoom = () => {
       return;
     }
 
-    // to square
     const move = makeMove({
       from: moveFrom,
       to: square,
-      promotion: 'q', // always promote to queen for simplicity
+      promotion: 'q',
     });
 
-    // if invalid, check if we're just picking another of our pieces
-    if (!move) {
+    if (move) {
+      console.log('Move successful via click');
+      setMoveFrom('');
+      setOptionSquares({});
+    } else {
       const piece = game.get(square);
       if (piece && piece.color === playerColor && isMyTurn) {
         setMoveFrom(square);
@@ -147,11 +153,7 @@ const GameRoom = () => {
         setMoveFrom('');
         setOptionSquares({});
       }
-      return;
     }
-
-    setMoveFrom('');
-    setOptionSquares({});
   }
 
   function onPieceDrop(sourceSquare, targetSquare) {
@@ -192,7 +194,10 @@ const GameRoom = () => {
             color={playerColor === 'w' ? 'black' : 'white'}
           />
 
-          <div className="chessboard-wrapper nm-card">
+          <div 
+            className="chessboard-wrapper nm-card"
+            onClick={() => console.log('Board Wrapper Clicked!')}
+          >
             {emojiMessage && (
               <div className="emoji-popup animate-bounce">
                 {emojiMessage.emoji}
