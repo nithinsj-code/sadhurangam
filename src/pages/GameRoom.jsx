@@ -75,6 +75,21 @@ const GameRoom = () => {
     stateRef.current = { moveFrom, playerColor, isMyTurn, game, room, makeMove };
   }, [moveFrom, playerColor, isMyTurn, game, room, makeMove]);
 
+  const handlePieceDrop = useCallback((source, target) => {
+    return onPieceDrop(source, target);
+  }, []);
+
+  const handleSquareClick = useCallback((square) => {
+    return onSquareClick(square);
+  }, []);
+
+  const customDarkSquareStyle = useMemo(() => ({ backgroundColor: 'var(--board-dark)' }), []);
+  const customLightSquareStyle = useMemo(() => ({ backgroundColor: 'var(--board-light)' }), []);
+  const mergedSquareStyles = useMemo(() => ({
+    ...optionSquares,
+    ...rightClickedSquares,
+  }), [optionSquares, rightClickedSquares]);
+
   if (loading) return (
     <div className="game-container flex items-center justify-center">
       <div className="nm-card p-8 text-center animate-pulse">
@@ -234,20 +249,6 @@ const GameRoom = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handlePieceDrop = useCallback((source, target) => {
-    return onPieceDrop(source, target);
-  }, []);
-
-  const handleSquareClick = useCallback((square) => {
-    return onSquareClick(square);
-  }, []);
-
-  const customDarkSquareStyle = useMemo(() => ({ backgroundColor: 'var(--board-dark)' }), []);
-  const customLightSquareStyle = useMemo(() => ({ backgroundColor: 'var(--board-light)' }), []);
-  const mergedSquareStyles = useMemo(() => ({
-    ...optionSquares,
-    ...rightClickedSquares,
-  }), [optionSquares, rightClickedSquares]);
 
   return (
     <div className="game-container animate-fade">
