@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
@@ -51,11 +51,21 @@ const GameRoom = () => {
     return true;
   }
 
+  // Use a ref to bypass react-chessboard's stale closure bug
+  // react-chessboard caches onPieceDrop and onSquareClick on mount, 
+  // so they will forever see playerColor as null if we don't use a ref.
+  const stateRef = useRef({});
+  useEffect(() => {
+    stateRef.current = { moveFrom, playerColor, isMyTurn, game, makeMove };
+  }, [moveFrom, playerColor, isMyTurn, game, makeMove]);
+
   const handleSquareClick = useCallback((square) => {
+    const state = stateRef.current;
+    
     // If no piece is selected yet, try to select one
-    if (!moveFrom) {
-      const piece = game.get(square);
-      if (piece && piece.color === playerColor && isMyTurn) {
+    if (!state.moveFrom) {
+      const piece = state.game.get(square);
+      if (piece && piece.color === state.playerColor && state.isMyTurn) {
         setMoveFrom(square);
         getMoveOptions(square);
       }
@@ -64,12 +74,12 @@ const GameRoom = () => {
 
     // A piece is already selected — try to move to the clicked square
     try {
-      const testGame = new Chess(game.fen());
-      const result = testGame.move({ from: moveFrom, to: square, promotion: 'q' });
+      const testGame = new Chess(state.game.fen());
+      const result = testGame.move({ from: state.moveFrom, to: square, promotion: 'q' });
       
       if (result) {
         // Valid move — execute it
-        makeMove({ from: moveFrom, to: square, promotion: 'q' });
+        state.makeMove({ from: state.moveFrom, to: square, promotion: 'q' });
         setMoveFrom('');
         setOptionSquares({});
         return;
@@ -79,25 +89,26 @@ const GameRoom = () => {
     }
 
     // Invalid move — check if clicking a different own piece
-    const piece = game.get(square);
-    if (piece && piece.color === playerColor && isMyTurn) {
+    const piece = state.game.get(square);
+    if (piece && piece.color === state.playerColor && state.isMyTurn) {
       setMoveFrom(square);
       getMoveOptions(square);
     } else {
       setMoveFrom('');
       setOptionSquares({});
     }
-  }, [moveFrom, game, playerColor, isMyTurn, makeMove]);
+  }, []); // Empty dependencies because it uses stateRef
 
   const handlePieceDrop = useCallback((sourceSquare, targetSquare) => {
-    if (playerColor !== game.turn()) return false;
+    const state = stateRef.current;
+    if (state.playerColor !== state.game.turn()) return false;
 
     try {
-      const testGame = new Chess(game.fen());
+      const testGame = new Chess(state.game.fen());
       const result = testGame.move({ from: sourceSquare, to: targetSquare, promotion: 'q' });
       
       if (result) {
-        makeMove({ from: sourceSquare, to: targetSquare, promotion: 'q' });
+        state.makeMove({ from: sourceSquare, to: targetSquare, promotion: 'q' });
         setMoveFrom('');
         setOptionSquares({});
         return true;
@@ -106,7 +117,7 @@ const GameRoom = () => {
       // Invalid move
     }
     return false;
-  }, [playerColor, game, makeMove]);
+  }, []); // Empty dependencies because it uses stateRef
 
   // Debug logging
   useEffect(() => {
