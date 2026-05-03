@@ -70,6 +70,11 @@ const GameRoom = () => {
     }
   }, [room?.status]);
 
+  const stateRef = useRef({});
+  useEffect(() => {
+    stateRef.current = { moveFrom, playerColor, isMyTurn, game, room, makeMove };
+  }, [moveFrom, playerColor, isMyTurn, game, room, makeMove]);
+
   if (loading) return (
     <div className="game-container flex items-center justify-center">
       <div className="nm-card p-8 text-center animate-pulse">
@@ -88,11 +93,6 @@ const GameRoom = () => {
       </div>
     </div>
   );
-
-  const stateRef = useRef({});
-  useEffect(() => {
-    stateRef.current = { moveFrom, playerColor, isMyTurn, game, room, makeMove };
-  }, [moveFrom, playerColor, isMyTurn, game, room, makeMove]);
 
   function getMoveOptions(square) {
     const { game } = stateRef.current;
