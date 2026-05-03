@@ -209,9 +209,15 @@ const GameRoom = () => {
               <Chessboard 
                 position={game.fen()} 
                 onPieceDrop={onPieceDrop}
-                onSquareClick={onSquareClick}
+                onSquareClick={(square) => {
+                  console.log('CHESSBOARD SQUARED CLICKED:', square);
+                  onSquareClick(square);
+                }}
+                onPieceClick={(piece) => {
+                  console.log('CHESSBOARD PIECE CLICKED:', piece);
+                }}
                 boardOrientation={playerColor === 'b' ? 'black' : 'white'}
-                arePiecesDraggable={true}
+                arePiecesDraggable={false}
                 customDarkSquareStyle={{ backgroundColor: 'var(--board-dark)' }}
                 customLightSquareStyle={{ backgroundColor: 'var(--board-light)' }}
                 customDropSquareStyle={{ boxShadow: 'inset 0 0 1px 6px rgba(168, 85, 247, 0.75)' }}
