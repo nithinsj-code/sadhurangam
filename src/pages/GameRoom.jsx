@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { useAuth } from '../hooks/useAuth';
 import { useChessGame } from '../hooks/useChessGame';
 import { 
-  Copy, Share2, Flag, RotateCcw, MessageCircle, 
-  ChevronLeft, ChevronRight, Menu, X, Trophy
+  Copy, Flag, RotateCcw, Menu, X, Trophy
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase } from '../lib/supabase';
@@ -17,7 +17,6 @@ const GameRoom = () => {
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [emojiMessage, setEmojiMessage] = useState(null);
   const [moveFrom, setMoveFrom] = useState('');
-  const [rightClickedSquares, setRightClickedSquares] = useState({});
   const [optionSquares, setOptionSquares] = useState({});
 
   const {
@@ -26,23 +25,20 @@ const GameRoom = () => {
     makeMove, sendEmoji, resign, requestRematch, acceptRematch
   } = useChessGame(roomCode, profile);
 
+  // Debug logging
   useEffect(() => {
     console.log('GameRoom State Update:', { playerColor, isMyTurn, turn: game.turn(), status: room?.status });
-  }, [playerColor, isMyTurn, game.fen(), room?.status]);
+  }, [playerColor, isMyTurn, game, room?.status]);
 
+  // Emoji + rematch listeners
   useEffect(() => {
     const handleEmoji = (e) => {
       setEmojiMessage(e.detail);
       setTimeout(() => setEmojiMessage(null), 3000);
     };
 
-    const handleRematchAccepted = (e) => {
-      navigate(`/game/${e.detail.newCode}`);
-    };
-
     window.addEventListener('chess-emoji', handleEmoji);
     
-    // Subscribe to rematch broadcast
     const channelId = `rematch:${roomCode}`;
     const channel = supabase.channel(channelId);
     
@@ -56,40 +52,18 @@ const GameRoom = () => {
       window.removeEventListener('chess-emoji', handleEmoji);
       supabase.removeChannel(channel);
     };
-  }, [roomCode]);
+  }, [roomCode, navigate]);
 
+  // Confetti on win
   useEffect(() => {
     if (room?.status === 'finished' && room.winner_id) {
-      if (room.winner_id === profile.id) {
-        confetti({
-          particleCount: 150,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
+      if (room.winner_id === profile?.id) {
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
       }
     }
-  }, [room?.status]);
+  }, [room?.status, room?.winner_id, profile?.id]);
 
-  const stateRef = useRef({});
-  useEffect(() => {
-    stateRef.current = { moveFrom, playerColor, isMyTurn, game, room, makeMove };
-  }, [moveFrom, playerColor, isMyTurn, game, room, makeMove]);
-
-  const handlePieceDrop = useCallback((source, target) => {
-    return onPieceDrop(source, target);
-  }, []);
-
-  const handleSquareClick = useCallback((square) => {
-    return onSquareClick(square);
-  }, []);
-
-  const customDarkSquareStyle = useMemo(() => ({ backgroundColor: 'var(--board-dark)' }), []);
-  const customLightSquareStyle = useMemo(() => ({ backgroundColor: 'var(--board-light)' }), []);
-  const mergedSquareStyles = useMemo(() => ({
-    ...optionSquares,
-    ...rightClickedSquares,
-  }), [optionSquares, rightClickedSquares]);
-
+  // Loading state
   if (loading) return (
     <div className="game-container flex items-center justify-center">
       <div className="nm-card p-8 text-center animate-pulse">
@@ -99,6 +73,7 @@ const GameRoom = () => {
     </div>
   );
 
+  // Error state
   if (error || !room) return (
     <div className="game-container flex items-center justify-center">
       <div className="nm-card p-8 text-center" style={{borderColor: 'var(--danger)'}}>
@@ -109,21 +84,17 @@ const GameRoom = () => {
     </div>
   );
 
+  // --- Chess interaction functions (simple, no refs, no memoization) ---
+
   function getMoveOptions(square) {
-    const { game } = stateRef.current;
-    console.log('getMoveOptions called for square:', square);
-    const moves = game.moves({
-      square,
-      verbose: true,
-    });
-    console.log('Available moves from', square, ':', moves);
+    const moves = game.moves({ square, verbose: true });
     if (moves.length === 0) {
       setOptionSquares({});
       return false;
     }
 
     const newSquares = {};
-    moves.map((move) => {
+    moves.forEach((move) => {
       newSquares[move.to] = {
         background:
           game.get(move.to) && game.get(move.to).color !== game.get(square).color
@@ -131,109 +102,65 @@ const GameRoom = () => {
             : 'radial-gradient(circle, rgba(168, 85, 247, .4) 20%, transparent 20%)',
         borderRadius: '50%',
       };
-      return move;
     });
-    newSquares[square] = {
-      background: 'rgba(168, 85, 247, 0.4)',
-    };
+    newSquares[square] = { background: 'rgba(168, 85, 247, 0.4)' };
     setOptionSquares(newSquares);
     return true;
   }
 
-  async function onSquareClick(square) {
-    const { moveFrom, playerColor, isMyTurn, game, makeMove } = stateRef.current;
-    console.log('--- onSquareClick ---', square);
-    console.log('Current state:', { moveFrom, playerColor, isMyTurn, turn: game.turn() });
-    
-    setRightClickedSquares({});
-
-    // from square
+  function handleSquareClick(square) {
+    // If no piece is selected yet, try to select one
     if (!moveFrom) {
       const piece = game.get(square);
-      console.log('Piece at clicked square:', piece);
       if (piece && piece.color === playerColor && isMyTurn) {
-        console.log('Selecting piece at', square);
         setMoveFrom(square);
         getMoveOptions(square);
-      } else {
-        console.log('Cannot select piece. color mismatch or not your turn.');
       }
       return;
     }
 
-    // Try to move
-    console.log('Attempting to move from', moveFrom, 'to', square);
-    const gameCopy = new Chess(game.fen());
-    let isValidMove = false;
+    // A piece is already selected — try to move to the clicked square
     try {
-      const move = gameCopy.move({
-        from: moveFrom,
-        to: square,
-        promotion: 'q',
-      });
-      if (move) isValidMove = true;
-    } catch (e) {
-      console.log('Invalid move error:', e.message);
-      isValidMove = false;
-    }
-
-    console.log('isValidMove?', isValidMove);
-
-    if (isValidMove) {
-      console.log('Executing makeMove...');
-      await makeMove({
-        from: moveFrom,
-        to: square,
-        promotion: 'q',
-      });
-      console.log('makeMove finished.');
-      setMoveFrom('');
-      setOptionSquares({});
-    } else {
-      const piece = game.get(square);
-      if (piece && piece.color === playerColor && isMyTurn) {
-        console.log('Selecting different piece:', square);
-        setMoveFrom(square);
-        getMoveOptions(square);
-      } else {
-        console.log('Clearing selection.');
+      const testGame = new Chess(game.fen());
+      const result = testGame.move({ from: moveFrom, to: square, promotion: 'q' });
+      
+      if (result) {
+        // Valid move — execute it
+        makeMove({ from: moveFrom, to: square, promotion: 'q' });
         setMoveFrom('');
         setOptionSquares({});
+        return;
       }
+    } catch (e) {
+      // Invalid move — fall through
+    }
+
+    // Invalid move — check if clicking a different own piece
+    const piece = game.get(square);
+    if (piece && piece.color === playerColor && isMyTurn) {
+      setMoveFrom(square);
+      getMoveOptions(square);
+    } else {
+      setMoveFrom('');
+      setOptionSquares({});
     }
   }
 
-  function onPieceDrop(sourceSquare, targetSquare) {
-    const { playerColor, game, makeMove } = stateRef.current;
-    console.log('--- onPieceDrop ---', sourceSquare, '->', targetSquare);
-    console.log('Current state:', { playerColor, turn: game.turn() });
-    
-    if (playerColor !== game.turn()) {
-      console.log('Not your turn! Rejecting drop.');
-      return false;
-    }
-    
-    const gameCopy = new Chess(game.fen());
+  function handlePieceDrop(sourceSquare, targetSquare) {
+    if (playerColor !== game.turn()) return false;
+
     try {
-      const move = gameCopy.move({
-        from: sourceSquare,
-        to: targetSquare,
-        promotion: 'q',
-      });
-      console.log('Drop valid locally. Executing makeMove...');
-      if (move) {
-        makeMove({
-          from: sourceSquare,
-          to: targetSquare,
-          promotion: 'q',
-        });
+      const testGame = new Chess(game.fen());
+      const result = testGame.move({ from: sourceSquare, to: targetSquare, promotion: 'q' });
+      
+      if (result) {
+        makeMove({ from: sourceSquare, to: targetSquare, promotion: 'q' });
         setMoveFrom('');
         setOptionSquares({});
         return true;
       }
     } catch (e) {
-      console.log('Invalid drop error:', e.message);
-      return false;
+      // Invalid move
     }
     return false;
   }
@@ -242,13 +169,6 @@ const GameRoom = () => {
     navigator.clipboard.writeText(roomCode);
     alert('Room code copied!');
   };
-
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
 
   return (
     <div className="game-container animate-fade">
@@ -273,9 +193,9 @@ const GameRoom = () => {
                 onSquareClick={handleSquareClick}
                 boardOrientation={playerColor === 'b' ? 'black' : 'white'}
                 arePiecesDraggable={true}
-                customDarkSquareStyle={customDarkSquareStyle}
-                customLightSquareStyle={customLightSquareStyle}
-                customSquareStyles={mergedSquareStyles}
+                customDarkSquareStyle={{ backgroundColor: 'var(--board-dark)' }}
+                customLightSquareStyle={{ backgroundColor: 'var(--board-light)' }}
+                customSquareStyles={optionSquares}
                 animationDuration={200}
               />
             )}
@@ -380,6 +300,11 @@ const GameRoom = () => {
         </div>
       )}
 
+      {emojiMessage && (
+        <div className="emoji-popup animate-fade">
+          <span className="emoji-large">{emojiMessage.emoji}</span>
+        </div>
+      )}
     </div>
   );
 };
@@ -416,7 +341,6 @@ const PlayerBar = ({ player, time, isTurn, captured, color, isSelf }) => {
       <div className={`timer nm-inset ${isLowTime ? 'timer-low' : ''} ${isTurn ? 'timer-active' : ''}`}>
         {formatTime(time)}
       </div>
-
     </div>
   );
 };

@@ -179,10 +179,10 @@ export const useChessGame = (roomCode, userProfile) => {
   const makeMove = async (move) => {
     console.log('makeMove called:', move, { playerColor, turn: game.turn(), status: room?.status });
     if (room.status === 'finished') return false;
-    // if (room.status === 'waiting') {
-    //   console.log('Waiting for opponent to join!');
-    //   return false;
-    // }
+    if (room.status === 'waiting') {
+      console.log('Waiting for opponent to join!');
+      return false;
+    }
     if (playerColor !== game.turn()) {
       console.log('Not your turn!');
       return false;
