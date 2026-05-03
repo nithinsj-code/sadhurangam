@@ -96,10 +96,12 @@ const GameRoom = () => {
 
   function getMoveOptions(square) {
     const { game } = stateRef.current;
+    console.log('getMoveOptions called for square:', square);
     const moves = game.moves({
       square,
       verbose: true,
     });
+    console.log('Available moves from', square, ':', moves);
     if (moves.length === 0) {
       setOptionSquares({});
       return false;
@@ -125,19 +127,27 @@ const GameRoom = () => {
 
   async function onSquareClick(square) {
     const { moveFrom, playerColor, isMyTurn, game, makeMove } = stateRef.current;
+    console.log('--- onSquareClick ---', square);
+    console.log('Current state:', { moveFrom, playerColor, isMyTurn, turn: game.turn() });
+    
     setRightClickedSquares({});
 
     // from square
     if (!moveFrom) {
       const piece = game.get(square);
+      console.log('Piece at clicked square:', piece);
       if (piece && piece.color === playerColor && isMyTurn) {
+        console.log('Selecting piece at', square);
         setMoveFrom(square);
         getMoveOptions(square);
+      } else {
+        console.log('Cannot select piece. color mismatch or not your turn.');
       }
       return;
     }
 
     // Try to move
+    console.log('Attempting to move from', moveFrom, 'to', square);
     const gameCopy = new Chess(game.fen());
     let isValidMove = false;
     try {
@@ -148,23 +158,30 @@ const GameRoom = () => {
       });
       if (move) isValidMove = true;
     } catch (e) {
+      console.log('Invalid move error:', e.message);
       isValidMove = false;
     }
 
+    console.log('isValidMove?', isValidMove);
+
     if (isValidMove) {
+      console.log('Executing makeMove...');
       await makeMove({
         from: moveFrom,
         to: square,
         promotion: 'q',
       });
+      console.log('makeMove finished.');
       setMoveFrom('');
       setOptionSquares({});
     } else {
       const piece = game.get(square);
       if (piece && piece.color === playerColor && isMyTurn) {
+        console.log('Selecting different piece:', square);
         setMoveFrom(square);
         getMoveOptions(square);
       } else {
+        console.log('Clearing selection.');
         setMoveFrom('');
         setOptionSquares({});
       }
@@ -173,7 +190,13 @@ const GameRoom = () => {
 
   function onPieceDrop(sourceSquare, targetSquare) {
     const { playerColor, game, makeMove } = stateRef.current;
-    if (playerColor !== game.turn()) return false;
+    console.log('--- onPieceDrop ---', sourceSquare, '->', targetSquare);
+    console.log('Current state:', { playerColor, turn: game.turn() });
+    
+    if (playerColor !== game.turn()) {
+      console.log('Not your turn! Rejecting drop.');
+      return false;
+    }
     
     const gameCopy = new Chess(game.fen());
     try {
@@ -182,6 +205,7 @@ const GameRoom = () => {
         to: targetSquare,
         promotion: 'q',
       });
+      console.log('Drop valid locally. Executing makeMove...');
       if (move) {
         makeMove({
           from: sourceSquare,
@@ -193,6 +217,7 @@ const GameRoom = () => {
         return true;
       }
     } catch (e) {
+      console.log('Invalid drop error:', e.message);
       return false;
     }
     return false;
