@@ -196,20 +196,31 @@ const GameRoom = () => {
           />
 
           <div 
-            id="board-test-wrapper"
+            className="chessboard-wrapper nm-card"
             onClick={(e) => {
-              console.log('Wrapper Click Details:', {
-                target: e.target.tagName,
-                className: e.target.className,
-                clientX: e.clientX,
-                clientY: e.clientY
-              });
-            }}
-            style={{ 
-              border: '4px solid green', 
-              padding: '10px', 
-              background: 'rgba(0,255,0,0.1)',
-              pointerEvents: 'auto'
+              const rect = e.currentTarget.getBoundingClientRect();
+              const x = e.clientX - rect.left - 8; // Subtract padding
+              const y = e.clientY - rect.top - 8;
+              const squareSize = (rect.width - 16) / 8;
+              
+              if (x < 0 || y < 0 || x > rect.width - 16 || y > rect.height - 16) return;
+
+              const fileIdx = Math.floor(x / squareSize);
+              const rankIdx = Math.floor(y / squareSize);
+              
+              // Handle orientation
+              let file, rank;
+              if (playerColor === 'b') {
+                file = String.fromCharCode('h'.charCodeAt(0) - fileIdx);
+                rank = (rankIdx + 1).toString();
+              } else {
+                file = String.fromCharCode('a'.charCodeAt(0) + fileIdx);
+                rank = (8 - rankIdx).toString();
+              }
+              
+              const square = `${file}${rank}`;
+              console.log('MANUAL SQUARE CLICK:', square);
+              onSquareClick(square);
             }}
           >
             {game && (
@@ -217,10 +228,6 @@ const GameRoom = () => {
                 id="main-board"
                 position={game.fen()} 
                 onPieceDrop={onPieceDrop}
-                onSquareClick={(square) => {
-                  console.log('INTERNAL BOARD CLICK:', square);
-                  onSquareClick(square);
-                }}
                 boardOrientation={playerColor === 'b' ? 'black' : 'white'}
                 arePiecesDraggable={true}
                 customDarkSquareStyle={{ backgroundColor: 'var(--board-dark)' }}
