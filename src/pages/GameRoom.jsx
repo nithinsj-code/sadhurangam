@@ -125,9 +125,10 @@ const GameRoom = () => {
     // from square
     if (!moveFrom) {
       const piece = game.get(square);
-      console.log('Piece at square:', piece);
-      // Allow selecting if it's your turn AND it's your piece
-      if (piece && piece.color === playerColor && isMyTurn) {
+      console.log('Piece at square:', piece, { playerColor });
+      // DEBUG: Allow clicking any piece for now
+      if (piece) {
+        console.log('Piece found, getting options...');
         setMoveFrom(square);
         getMoveOptions(square);
       }
@@ -197,6 +198,7 @@ const GameRoom = () => {
           <div 
             className="chessboard-wrapper nm-card"
             onClick={() => console.log('Board Wrapper Clicked!')}
+            style={{ border: '2px solid red' }}
           >
             {emojiMessage && (
               <div className="emoji-popup animate-bounce">
