@@ -89,7 +89,13 @@ const GameRoom = () => {
     </div>
   );
 
+  const stateRef = useRef({});
+  useEffect(() => {
+    stateRef.current = { moveFrom, playerColor, isMyTurn, game, room, makeMove };
+  }, [moveFrom, playerColor, isMyTurn, game, room, makeMove]);
+
   function getMoveOptions(square) {
+    const { game } = stateRef.current;
     const moves = game.moves({
       square,
       verbose: true,
@@ -118,6 +124,7 @@ const GameRoom = () => {
   }
 
   async function onSquareClick(square) {
+    const { moveFrom, playerColor, isMyTurn, game, makeMove } = stateRef.current;
     setRightClickedSquares({});
 
     // from square
@@ -165,6 +172,7 @@ const GameRoom = () => {
   }
 
   function onPieceDrop(sourceSquare, targetSquare) {
+    const { playerColor, game, makeMove } = stateRef.current;
     if (playerColor !== game.turn()) return false;
     
     const gameCopy = new Chess(game.fen());
