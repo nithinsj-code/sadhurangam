@@ -62,33 +62,31 @@ const GameRoom = () => {
   const handleSquareClick = useCallback((square) => {
     const state = stateRef.current;
     
-    // If no piece is selected yet, try to select one
     if (!state.moveFrom) {
       const piece = state.game.get(square);
       if (piece && piece.color === state.playerColor && state.isMyTurn) {
         setMoveFrom(square);
         getMoveOptions(square);
+      } else if (piece) {
+        alert(`Cannot select piece. Color: ${piece.color}, Your color: ${state.playerColor}, Turn: ${state.isMyTurn}`);
       }
       return;
     }
 
-    // A piece is already selected — try to move to the clicked square
     try {
       const testGame = new Chess(state.game.fen());
       const result = testGame.move({ from: state.moveFrom, to: square, promotion: 'q' });
       
       if (result) {
-        // Valid move — execute it
         state.makeMove({ from: state.moveFrom, to: square, promotion: 'q' });
         setMoveFrom('');
         setOptionSquares({});
         return;
       }
     } catch (e) {
-      // Invalid move — fall through
+      alert(`Invalid move click: ${e.message}`);
     }
 
-    // Invalid move — check if clicking a different own piece
     const piece = state.game.get(square);
     if (piece && piece.color === state.playerColor && state.isMyTurn) {
       setMoveFrom(square);
@@ -97,11 +95,14 @@ const GameRoom = () => {
       setMoveFrom('');
       setOptionSquares({});
     }
-  }, []); // Empty dependencies because it uses stateRef
+  }, []);
 
   const handlePieceDrop = useCallback((sourceSquare, targetSquare) => {
     const state = stateRef.current;
-    if (state.playerColor !== state.game.turn()) return false;
+    if (state.playerColor !== state.game.turn()) {
+      alert(`Not your turn! You are ${state.playerColor}, it is ${state.game.turn()}'s turn.`);
+      return false;
+    }
 
     try {
       const testGame = new Chess(state.game.fen());
@@ -112,12 +113,14 @@ const GameRoom = () => {
         setMoveFrom('');
         setOptionSquares({});
         return true;
+      } else {
+        alert("chess.js returned null for move");
       }
     } catch (e) {
-      // Invalid move
+      alert(`Invalid move drop: ${e.message}`);
     }
     return false;
-  }, []); // Empty dependencies because it uses stateRef
+  }, []);
 
   // Debug logging
   useEffect(() => {
