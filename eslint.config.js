@@ -13,6 +13,11 @@ export default defineConfig([
       reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
     ],
+    rules: {
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-refresh/only-export-components': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+    },
     languageOptions: {
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },

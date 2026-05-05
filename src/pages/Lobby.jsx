@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Plus, Hash, Users, Swords, Search, UserPlus, Check, X, Clock } from 'lucide-react';
+import { Plus, Users, Swords, UserPlus, Check, X } from 'lucide-react';
 
 const Lobby = () => {
   const { profile } = useAuth();
@@ -13,6 +13,33 @@ const Lobby = () => {
   const [challenges, setChallenges] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+
+  const fetchFriends = useCallback(async () => {
+    const { data } = await supabase
+      .from('friendships')
+      .select(`
+        *,
+        sender:users!friendships_sender_id_fkey(*),
+        receiver:users!friendships_receiver_id_fkey(*)
+      `)
+      .or(`sender_id.eq.${profile?.id},receiver_id.eq.${profile?.id}`)
+      .eq('status', 'accepted');
+    
+    if (data) {
+      const friendList = data.map(f => f.sender_id === profile.id ? f.receiver : f.sender);
+      setFriends(friendList);
+    }
+  }, [profile]);
+
+  const fetchChallenges = useCallback(async () => {
+    const { data } = await supabase
+      .from('challenges')
+      .select('*, challenger:users!challenges_challenger_id_fkey(*)')
+      .eq('opponent_id', profile?.id)
+      .eq('status', 'pending');
+    
+    if (data) setChallenges(data);
+  }, [profile]);
 
   useEffect(() => {
     if (!profile) return;
@@ -38,34 +65,7 @@ const Lobby = () => {
       supabase.removeChannel(challengesSub);
       supabase.removeChannel(friendsSub);
     };
-  }, [profile]);
-
-  const fetchFriends = async () => {
-    const { data, error } = await supabase
-      .from('friendships')
-      .select(`
-        *,
-        sender:users!friendships_sender_id_fkey(*),
-        receiver:users!friendships_receiver_id_fkey(*)
-      `)
-      .or(`sender_id.eq.${profile.id},receiver_id.eq.${profile.id}`)
-      .eq('status', 'accepted');
-    
-    if (data) {
-      const friendList = data.map(f => f.sender_id === profile.id ? f.receiver : f.sender);
-      setFriends(friendList);
-    }
-  };
-
-  const fetchChallenges = async () => {
-    const { data } = await supabase
-      .from('challenges')
-      .select('*, challenger:users!challenges_challenger_id_fkey(*)')
-      .eq('opponent_id', profile.id)
-      .eq('status', 'pending');
-    
-    if (data) setChallenges(data);
-  };
+  }, [profile, fetchFriends, fetchChallenges]);
 
   const [timeControl, setTimeControl] = useState(10);
 

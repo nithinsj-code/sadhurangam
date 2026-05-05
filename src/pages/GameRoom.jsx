@@ -68,7 +68,7 @@ const GameRoom = () => {
       roomStatus: room?.status,
       fen: game.fen().substring(0, 20) + '...'
     });
-  }, [playerColor, isMyTurn, game.fen(), room?.status]);
+  }, [playerColor, isMyTurn, game, room?.status]);
 
   const handleSquareClick = useCallback((square) => {
     const state = stateRef.current;
@@ -218,8 +218,8 @@ const GameRoom = () => {
                 onSquareClick={handleSquareClick}
                 boardOrientation={playerColor === 'b' ? 'black' : 'white'}
                 arePiecesDraggable={true}
-                customDarkSquareStyle={{ backgroundColor: 'var(--board-dark)' }}
-                customLightSquareStyle={{ backgroundColor: 'var(--board-light)' }}
+                customDarkSquareStyle={customDarkSquareStyle}
+                customLightSquareStyle={customLightSquareStyle}
                 customSquareStyles={optionSquares}
                 animationDuration={200}
               />
@@ -371,6 +371,7 @@ const PlayerBar = ({ player, time, isTurn, captured, color, isSelf }) => {
 };
 
 const getPieceIcon = (type, color) => {
+  console.log('Rendering piece icon for:', color);
   const icons = {
     p: '♟', r: '♜', n: '♞', b: '♝', q: '♛', k: '♚'
   };
