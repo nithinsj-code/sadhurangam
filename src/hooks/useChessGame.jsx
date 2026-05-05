@@ -15,18 +15,23 @@ export const useChessGame = (roomCode, userProfile) => {
   
   const timerRef = useRef(null);
 
+  const channelRef = useRef(null);
+
   // Initial fetch
   useEffect(() => {
-    fetchRoom();
+    if (roomCode) fetchRoom();
   }, [roomCode]);
 
-  // Handle Realtime
+  // Handle Realtime (Moves, Emojis, Room Updates)
   useEffect(() => {
-    if (!room) return;
+    if (!roomCode) return;
 
     const channelId = `room:${roomCode}`;
     const channel = supabase.channel(channelId);
+    channelRef.current = channel;
     
+    console.log('Subscribing to channel:', channelId);
+
     channel
       .on('postgres_changes', { 
         event: 'UPDATE', 
@@ -35,30 +40,51 @@ export const useChessGame = (roomCode, userProfile) => {
         filter: `code=eq.${roomCode}` 
       }, (payload) => {
         const newRoom = payload.new;
+        console.log('Postgres Update:', newRoom.status);
         setRoom(newRoom);
         
-        try {
-          const newGame = new Chess(newRoom.fen || undefined);
-          setGame(newGame);
-          setTimers({ 
-            white: newRoom.white_time_remaining ?? 600, 
-            black: newRoom.black_time_remaining ?? 600 
-          });
-          setMoveHistory(newGame.history({ verbose: true }));
-          updateCaptured(newGame);
-        } catch (chessErr) {
-          console.error('Realtime chess update error:', chessErr);
-        }
+        // Only update game if FEN has changed and we are not the one who just moved
+        // Actually, it's safer to just sync FEN if it's different
+        setGame(prevGame => {
+          if (newRoom.fen && newRoom.fen !== prevGame.fen()) {
+            console.log('Syncing FEN from DB');
+            return new Chess(newRoom.fen);
+          }
+          return prevGame;
+        });
+
+        setTimers({ 
+          white: newRoom.white_time_remaining ?? 600, 
+          black: newRoom.black_time_remaining ?? 600 
+        });
+      })
+      .on('broadcast', { event: 'move' }, ({ payload }) => {
+        console.log('Broadcast Move Received:', payload);
+        const { move, senderId } = payload;
+        if (senderId === userProfile?.id) return; // Ignore our own moves
+
+        setGame(prevGame => {
+          const gameCopy = new Chess(prevGame.fen());
+          const result = gameCopy.move(move);
+          if (result) {
+            console.log('Applied broadcast move');
+            return gameCopy;
+          }
+          return prevGame;
+        });
       })
       .on('broadcast', { event: 'emoji' }, ({ payload }) => {
         window.dispatchEvent(new CustomEvent('chess-emoji', { detail: payload }));
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Supabase Subscription Status:', status);
+      });
 
     return () => {
+      console.log('Unsubscribing from channel:', channelId);
       supabase.removeChannel(channel);
     };
-  }, [room?.id, roomCode]);
+  }, [roomCode, userProfile?.id]);
 
   // Timers
   useEffect(() => {
@@ -67,9 +93,8 @@ export const useChessGame = (roomCode, userProfile) => {
     if (timerRef.current) clearInterval(timerRef.current);
 
     timerRef.current = setInterval(() => {
-      const activeColor = game.turn() === 'w' ? 'white' : 'black';
-      
       setTimers(prev => {
+        const activeColor = game.turn() === 'w' ? 'white' : 'black';
         const newVal = Math.max(0, prev[activeColor] - 1);
         if (newVal === 0) {
           handleTimeout(activeColor);
@@ -81,28 +106,26 @@ export const useChessGame = (roomCode, userProfile) => {
     return () => clearInterval(timerRef.current);
   }, [room?.status, game.fen()]);
 
+  // Player Color & Turn logic
   useEffect(() => {
-    if (!room || !userProfile) {
-      console.log('Waiting for room or userProfile...', { room: !!room, userProfile: !!userProfile });
-      return;
+    if (!room || !userProfile) return;
+    
+    let myColor = null;
+    if (room.white_player_id === userProfile.id) {
+      myColor = 'w';
+    } else if (room.black_player_id === userProfile.id) {
+      myColor = 'b';
     }
     
-    console.log('Room IDs:', { white: room.white_player_id, black: room.black_player_id });
-    console.log('User ID:', userProfile.id);
-
-    if (room.white_player_id === userProfile.id) {
-      console.log('Setting player color to WHITE');
-      setPlayerColor('w');
-    } else if (room.black_player_id === userProfile.id) {
-      console.log('Setting player color to BLACK');
-      setPlayerColor('b');
-    } else {
-      console.log('Setting player color to NULL (Spectator)');
-      setPlayerColor(null);
-    }
-
-    setIsMyTurn(game.turn() === (room.white_player_id === userProfile.id ? 'w' : 'b'));
-  }, [room, game.fen(), userProfile]);
+    setPlayerColor(myColor);
+    const turn = game.turn();
+    setIsMyTurn(myColor === turn);
+    
+    setMoveHistory(game.history({ verbose: true }));
+    updateCaptured(game);
+    
+    console.log('Game State Update:', { myColor, turn, isMyTurn: myColor === turn });
+  }, [room, game.fen(), userProfile?.id]);
 
   const fetchRoom = async () => {
     try {
@@ -115,7 +138,7 @@ export const useChessGame = (roomCode, userProfile) => {
           black_player:black_player_id(*)
         `)
         .eq('code', roomCode)
-        .maybeSingle(); // Use maybeSingle to avoid 406 error
+        .maybeSingle();
 
       if (error) throw error;
       if (!data) {
@@ -125,20 +148,12 @@ export const useChessGame = (roomCode, userProfile) => {
       }
       
       setRoom(data);
-      
-      try {
-        const newGame = new Chess(data.fen || undefined);
-        setGame(newGame);
-        setTimers({ 
-          white: data.white_time_remaining ?? 600, 
-          black: data.black_time_remaining ?? 600 
-        });
-        setMoveHistory(newGame.history({ verbose: true }));
-        updateCaptured(newGame);
-      } catch (chessErr) {
-        console.error('Chess initialization error:', chessErr);
-        setGame(new Chess()); // Fallback to start position
-      }
+      const initialGame = new Chess(data.fen || undefined);
+      setGame(initialGame);
+      setTimers({ 
+        white: data.white_time_remaining ?? 600, 
+        black: data.black_time_remaining ?? 600 
+      });
       
       setLoading(false);
     } catch (err) {
@@ -149,11 +164,7 @@ export const useChessGame = (roomCode, userProfile) => {
   };
 
   const updateCaptured = (chess) => {
-    // Logic to calculate captured pieces from FEN
-    // Simplified: compare starting pieces with current FEN
-    const starting = {
-      p: 8, r: 2, n: 2, b: 2, q: 1
-    };
+    const starting = { p: 8, r: 2, n: 2, b: 2, q: 1 };
     const current = {
       w: { p: 0, r: 0, n: 0, b: 0, q: 0 },
       b: { p: 0, r: 0, n: 0, b: 0, q: 0 }
@@ -161,7 +172,7 @@ export const useChessGame = (roomCode, userProfile) => {
     
     chess.board().forEach(row => {
       row.forEach(square => {
-        if (square) current[square.color][square.type]++;
+        if (square && square.type !== 'k') current[square.color][square.type]++;
       });
     });
 
@@ -176,15 +187,12 @@ export const useChessGame = (roomCode, userProfile) => {
     setCaptured({ white: capturedW, black: capturedB });
   };
 
-  const makeMove = async (move) => {
-    console.log('makeMove called:', move, { playerColor, turn: game.turn(), status: room?.status });
-    if (room.status === 'finished') return false;
-    // if (room.status === 'waiting') {
-    //   console.log('Waiting for opponent to join!');
-    //   return false;
-    // }
-    if (playerColor !== game.turn()) {
-      console.log('Not your turn!');
+  const makeMove = useCallback(async (move) => {
+    if (room?.status === 'finished') return false;
+    
+    const turn = game.turn();
+    if (playerColor !== turn) {
+      console.log('Not your turn!', { playerColor, turn });
       return false;
     }
 
@@ -193,11 +201,22 @@ export const useChessGame = (roomCode, userProfile) => {
       const result = gameCopy.move(move);
       
       if (result) {
+        // 1. Update local state immediately for responsiveness
         setGame(gameCopy);
         
-        // Update Supabase
+        // 2. Broadcast the move immediately
+        if (channelRef.current) {
+          console.log('Broadcasting move:', move);
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'move',
+            payload: { move, senderId: userProfile.id }
+          });
+        }
+
+        // 3. Update Supabase Database
         const isGameOver = gameCopy.isGameOver();
-        let status = 'active';
+        let status = room.status;
         let winnerId = null;
 
         if (isGameOver) {
@@ -205,9 +224,11 @@ export const useChessGame = (roomCode, userProfile) => {
           if (gameCopy.isCheckmate()) {
             winnerId = gameCopy.turn() === 'w' ? room.black_player_id : room.white_player_id;
           }
+        } else if (status === 'waiting') {
+          status = 'active'; // Should already be active if two players joined, but just in case
         }
 
-        const { error } = await supabase
+        const { error: updateError } = await supabase
           .from('rooms')
           .update({
             fen: gameCopy.fen(),
@@ -219,9 +240,13 @@ export const useChessGame = (roomCode, userProfile) => {
           })
           .eq('id', room.id);
 
-        if (error) throw error;
+        if (updateError) {
+          console.error('DB Update Error:', updateError);
+          // Rollback local state if DB update fails? 
+          // For now just log it.
+        }
 
-        // Record move
+        // 4. Record move in history table
         await supabase.from('moves').insert([{
           room_id: room.id,
           player_id: userProfile.id,
@@ -235,7 +260,7 @@ export const useChessGame = (roomCode, userProfile) => {
       console.error('Move error:', err);
     }
     return false;
-  };
+  }, [room, game, playerColor, userProfile?.id, timers]);
 
   const handleTimeout = async (color) => {
     if (room.status !== 'active') return;

@@ -59,6 +59,17 @@ const GameRoom = () => {
     stateRef.current = { moveFrom, playerColor, isMyTurn, game, makeMove };
   }, [moveFrom, playerColor, isMyTurn, game, makeMove]);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('GameRoom Stats:', { 
+      playerColor, 
+      isMyTurn, 
+      turn: game.turn(), 
+      roomStatus: room?.status,
+      fen: game.fen().substring(0, 20) + '...'
+    });
+  }, [playerColor, isMyTurn, game.fen(), room?.status]);
+
   const handleSquareClick = useCallback((square) => {
     const state = stateRef.current;
     
@@ -68,25 +79,30 @@ const GameRoom = () => {
         setMoveFrom(square);
         getMoveOptions(square);
       } else if (piece) {
-        alert(`Cannot select piece. Color: ${piece.color}, Your color: ${state.playerColor}, Turn: ${state.isMyTurn}`);
+        console.log('Cannot select piece:', { 
+          pieceColor: piece.color, 
+          playerColor: state.playerColor, 
+          isMyTurn: state.isMyTurn 
+        });
       }
       return;
     }
 
     try {
       const testGame = new Chess(state.game.fen());
-      const result = testGame.move({ from: state.moveFrom, to: square, promotion: 'q' });
+      const moveResult = testGame.move({ from: state.moveFrom, to: square, promotion: 'q' });
       
-      if (result) {
+      if (moveResult) {
         state.makeMove({ from: state.moveFrom, to: square, promotion: 'q' });
         setMoveFrom('');
         setOptionSquares({});
         return;
       }
     } catch (e) {
-      alert(`Invalid move click: ${e.message}`);
+      console.warn('Move validation error:', e.message);
     }
 
+    // If we click another piece of our color, select it instead
     const piece = state.game.get(square);
     if (piece && piece.color === state.playerColor && state.isMyTurn) {
       setMoveFrom(square);
@@ -99,8 +115,8 @@ const GameRoom = () => {
 
   const handlePieceDrop = useCallback((sourceSquare, targetSquare) => {
     const state = stateRef.current;
+    
     if (state.playerColor !== state.game.turn()) {
-      alert(`Not your turn! You are ${state.playerColor}, it is ${state.game.turn()}'s turn.`);
       return false;
     }
 
@@ -113,19 +129,12 @@ const GameRoom = () => {
         setMoveFrom('');
         setOptionSquares({});
         return true;
-      } else {
-        alert("chess.js returned null for move");
       }
     } catch (e) {
-      alert(`Invalid move drop: ${e.message}`);
+      console.error('Drop move error:', e.message);
     }
     return false;
   }, []);
-
-  // Debug logging
-  useEffect(() => {
-    console.log('GameRoom State Update:', { playerColor, isMyTurn, turn: game.turn(), status: room?.status });
-  }, [playerColor, isMyTurn, game, room?.status]);
 
   // Emoji + rematch listeners
   useEffect(() => {
