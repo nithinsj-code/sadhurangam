@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Plus, Users, Swords, UserPlus, Check, X } from 'lucide-react';
+import { Swords } from 'lucide-react';
 
 const Lobby = () => {
   const { profile } = useAuth();
@@ -73,7 +73,7 @@ const Lobby = () => {
     setLoading(true);
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('rooms')
       .insert([{ 
         code, 
