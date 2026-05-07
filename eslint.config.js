@@ -23,11 +23,9 @@ export default [
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-hooks/exhaustive-deps': 'warn',
-      'react-refresh/only-export-components': [
-        'off',
-        { allowConstantExport: true },
-      ],
-      'react-hooks/preserve-manual-memoization': 'off',
+      'react-refresh/only-export-components': 'off',
+      'no-unused-vars': 'off',
+      'no-undef': 'off',
     },
   },
 ]

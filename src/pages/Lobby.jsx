@@ -73,7 +73,7 @@ const Lobby = () => {
     setLoading(true);
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('rooms')
       .insert([{ 
         code, 
