@@ -114,16 +114,20 @@ export const useChessGame = (roomCode, userProfile) => {
         filter: `code=eq.${roomCode}` 
       }, (payload) => {
         const newRoom = payload.new;
-        console.log('Postgres Update:', newRoom.status);
-        setRoom(newRoom);
+        console.log('Realtime Update Received:', newRoom.status);
         
-        setGame(prevGame => {
-          if (newRoom.fen && newRoom.fen !== prevGame.fen()) {
-            console.log('Syncing FEN from DB');
-            return new Chess(newRoom.fen);
-          }
-          return prevGame;
-        });
+        // Merge the new data with existing player info
+        setRoom(prev => ({ ...prev, ...newRoom }));
+        
+        if (newRoom.fen) {
+          setGame(prevGame => {
+            if (newRoom.fen !== prevGame.fen()) {
+              console.log('Syncing FEN from DB:', newRoom.fen);
+              return new Chess(newRoom.fen);
+            }
+            return prevGame;
+          });
+        }
 
         setTimers({ 
           white: newRoom.white_time_remaining ?? 600, 
@@ -182,7 +186,10 @@ export const useChessGame = (roomCode, userProfile) => {
 
   // Player Color & Turn logic
   useEffect(() => {
-    if (!room || !userProfile) return;
+    if (!room || !userProfile) {
+      console.log('Player assignment skipped: room or profile missing');
+      return;
+    }
     
     let myColor = null;
     if (room.white_player_id === userProfile.id) {
@@ -191,14 +198,19 @@ export const useChessGame = (roomCode, userProfile) => {
       myColor = 'b';
     }
     
+    console.log('Player Identity Check:', {
+      myId: userProfile.id,
+      whiteId: room.white_player_id,
+      blackId: room.black_player_id,
+      assignedColor: myColor
+    });
+
     setPlayerColor(myColor);
     const turn = game.turn();
     setIsMyTurn(myColor === turn);
     
     setMoveHistory(game.history({ verbose: true }));
     updateCaptured(game);
-    
-    console.log('Game State Update:', { myColor, turn, isMyTurn: myColor === turn });
   }, [room, game, userProfile?.id, updateCaptured]);
 
   const makeMove = useCallback(async (move) => {

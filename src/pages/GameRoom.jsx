@@ -29,8 +29,10 @@ const GameRoom = () => {
   const customDarkSquareStyle = useMemo(() => ({ backgroundColor: 'var(--board-dark)' }), []);
   const customLightSquareStyle = useMemo(() => ({ backgroundColor: 'var(--board-light)' }), []);
 
-  function getMoveOptions(square) {
-    const moves = game.moves({ square, verbose: true });
+  function getMoveOptions(square, currentGame) {
+    const chessInstance = currentGame || game;
+    const moves = chessInstance.moves({ square, verbose: true });
+    
     if (moves.length === 0) {
       setOptionSquares({});
       return false;
@@ -40,7 +42,7 @@ const GameRoom = () => {
     moves.forEach((move) => {
       newSquares[move.to] = {
         background:
-          game.get(move.to) && game.get(move.to).color !== game.get(square).color
+          chessInstance.get(move.to) && chessInstance.get(move.to).color !== chessInstance.get(square).color
             ? 'radial-gradient(circle, rgba(168, 85, 247, .4) 85%, transparent 85%)'
             : 'radial-gradient(circle, rgba(168, 85, 247, .4) 20%, transparent 20%)',
         borderRadius: '50%',
@@ -75,15 +77,10 @@ const GameRoom = () => {
     
     if (!state.moveFrom) {
       const piece = state.game.get(square);
+      // Check if it's a piece of the player's color and it's their turn
       if (piece && piece.color === state.playerColor && state.isMyTurn) {
         setMoveFrom(square);
-        getMoveOptions(square);
-      } else if (piece) {
-        console.log('Cannot select piece:', { 
-          pieceColor: piece.color, 
-          playerColor: state.playerColor, 
-          isMyTurn: state.isMyTurn 
-        });
+        getMoveOptions(square, state.game);
       }
       return;
     }
@@ -106,12 +103,12 @@ const GameRoom = () => {
     const piece = state.game.get(square);
     if (piece && piece.color === state.playerColor && state.isMyTurn) {
       setMoveFrom(square);
-      getMoveOptions(square);
+      getMoveOptions(square, state.game);
     } else {
       setMoveFrom('');
       setOptionSquares({});
     }
-  }, []);
+  }, []); // Depend on nothing as we use stateRef for everything
 
   const handlePieceDrop = useCallback((sourceSquare, targetSquare) => {
     const state = stateRef.current;
