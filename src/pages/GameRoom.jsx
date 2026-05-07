@@ -207,7 +207,7 @@ const GameRoom = () => {
           />
 
           <div className="chessboard-wrapper nm-card">
-            {game && (
+            {game && typeof game.fen === 'function' && (
               <Chessboard 
                 id="main-board"
                 position={game.fen()} 

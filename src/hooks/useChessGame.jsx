@@ -114,14 +114,16 @@ export const useChessGame = (roomCode, userProfile) => {
         filter: `code=eq.${roomCode}` 
       }, (payload) => {
         const newRoom = payload.new;
+        if (!newRoom) return;
+        
         console.log('Realtime Update Received:', newRoom.status);
         
-        // Merge the new data with existing player info
-        setRoom(prev => ({ ...prev, ...newRoom }));
+        // Merge the new data safely
+        setRoom(prev => prev ? { ...prev, ...newRoom } : newRoom);
         
         if (newRoom.fen) {
           setGame(prevGame => {
-            if (newRoom.fen !== prevGame.fen()) {
+            if (!prevGame || typeof prevGame.fen !== 'function' || newRoom.fen !== prevGame.fen()) {
               console.log('Syncing FEN from DB:', newRoom.fen);
               return new Chess(newRoom.fen);
             }
