@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Swords } from 'lucide-react';
+import { Swords, Plus, Check, X, Users, UserPlus } from 'lucide-react';
 
 const Lobby = () => {
   const { profile } = useAuth();

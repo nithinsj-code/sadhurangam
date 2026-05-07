@@ -24,8 +24,8 @@ export default [
       ...reactHooks.configs.recommended.rules,
       'react-hooks/exhaustive-deps': 'warn',
       'react-refresh/only-export-components': 'off',
-      'no-unused-vars': 'off',
-      'no-undef': 'off',
+      'no-unused-vars': 'warn',
+      'no-undef': 'error',
     },
   },
 ]
