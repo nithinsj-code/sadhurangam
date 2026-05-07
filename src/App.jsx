@@ -10,7 +10,16 @@ import './index.css';
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
   
-  if (loading) return <div className="loading-screen">Loading...</div>;
+  if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-red-900 text-white p-4 text-center">
+        <h1 className="text-2xl font-bold mb-2">Missing Configuration</h1>
+        <p>Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your Vercel Environment Variables.</p>
+      </div>
+    );
+  }
+  
+  if (loading) return <div className="loading-screen text-white">Loading...</div>;
   if (!user) return <Navigate to="/auth" />;
   
   return children;
