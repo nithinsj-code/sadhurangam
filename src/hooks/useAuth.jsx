@@ -46,6 +46,12 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const fetchProfile = async (userId) => {
+    // Safety timeout: don't hang for more than 3 seconds
+    const timeout = setTimeout(() => {
+      console.warn('Profile fetch timed out, continuing with default profile.');
+      setLoading(false);
+    }, 3000);
+
     try {
       const { data, error } = await supabase
         .from('users')
@@ -53,11 +59,18 @@ export const AuthProvider = ({ children }) => {
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
-      setProfile(data);
+      if (error) {
+        console.warn('No profile found in "users" table, checking "profiles"...');
+        // fallback to common table name if users fails
+        const { data: profData } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        if (profData) setProfile(profData);
+      } else {
+        setProfile(data);
+      }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Fetch profile crash:', error);
     } finally {
+      clearTimeout(timeout);
       setLoading(false);
     }
   };
