@@ -8,5 +8,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = (supabaseUrl && supabaseAnonKey) 
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storageKey: 'sadhurangam-auth-v2-' + Math.random().toString(36).substring(7)
+      }
+    })
   : null;

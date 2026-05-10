@@ -31,7 +31,8 @@ const AuthPage = () => {
       }
       navigate('/lobby');
     } catch (err) {
-      setError(err.message);
+      console.error('Auth error:', err);
+      setError(err.message || 'An unexpected authentication error occurred.');
     } finally {
       setLoading(false);
     }

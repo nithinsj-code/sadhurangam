@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Swords, Plus, Check, X, Users, UserPlus } from 'lucide-react';
 
 const Lobby = () => {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const navigate = useNavigate();
   const [roomCode, setRoomCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -70,29 +70,47 @@ const Lobby = () => {
   const [timeControl, setTimeControl] = useState(10);
 
   const handleCreateRoom = async () => {
+    console.log('handleCreateRoom started');
     setLoading(true);
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     
-    const { data, error } = await supabase
-      .from('rooms')
-      .insert([{ 
-        code, 
-        white_player_id: profile.id, 
-        status: 'waiting',
-        time_control_minutes: timeControl,
-        white_time_remaining: timeControl * 60,
-        black_time_remaining: timeControl * 60
-      }])
-      .select()
-      .single();
+    // Fallback to user.id if profile is not yet loaded
+    const playerId = profile?.id || user?.id;
+    console.log('Player ID for room creation:', playerId);
 
-    if (error) {
-      console.error('Room creation error:', error);
-      alert('Failed to create room: ' + error.message);
-    } else if (data) {
-      navigate(`/game/${code}`);
+    if (!playerId) {
+      console.error('No playerId found in Lobby');
+      alert('Authentication error: User ID not found. Please try logging out and in again.');
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    try {
+      const { data, error } = await supabase
+        .from('rooms')
+        .insert([{ 
+          code, 
+          white_player_id: playerId, 
+          status: 'waiting',
+          time_control_minutes: timeControl,
+          white_time_remaining: timeControl * 60,
+          black_time_remaining: timeControl * 60
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Room creation error:', error);
+        alert(`Failed to create room: ${error.message}\n\nThis often happens if your profile wasn't created correctly in the database.`);
+      } else if (data) {
+        navigate(`/game/${code}`);
+      }
+    } catch (err) {
+      console.error('Room creation crash:', err);
+      alert('An unexpected error occurred while creating the room.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleJoinRoom = async (e) => {

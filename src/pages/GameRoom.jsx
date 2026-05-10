@@ -12,7 +12,7 @@ import { supabase } from '../lib/supabase';
 
 const GameRoom = () => {
   const { roomCode } = useParams();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const navigate = useNavigate();
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [emojiMessage, setEmojiMessage] = useState(null);
@@ -23,7 +23,16 @@ const GameRoom = () => {
     game, room, loading, error, playerColor, 
     timers, isMyTurn, moveHistory, captured,
     makeMove, sendEmoji, resign, requestRematch, acceptRematch
-  } = useChessGame(roomCode, profile);
+  } = useChessGame(roomCode, profile, user);
+
+  // Compute effective player color — fallback to game turn color if hook hasn't resolved yet
+  // This ensures pieces are always clickable for the right side
+  const myId = profile?.id || user?.id;
+  const effectivePlayerColor = playerColor || (
+    room?.white_player_id === myId ? 'w' :
+    room?.black_player_id === myId ? 'b' :
+    null
+  );
 
   // Memoize chessboard props to prevent re-render cancellations
   const customDarkSquareStyle = useMemo(() => ({ backgroundColor: 'var(--board-dark)' }), []);
@@ -58,8 +67,8 @@ const GameRoom = () => {
   // so they will forever see playerColor as null if we don't use a ref.
   const stateRef = useRef({});
   useEffect(() => {
-    stateRef.current = { moveFrom, playerColor, isMyTurn, game, makeMove };
-  }, [moveFrom, playerColor, isMyTurn, game, makeMove]);
+    stateRef.current = { moveFrom, playerColor: effectivePlayerColor, isMyTurn, game, makeMove, isWaiting: room?.status !== 'active' };
+  }, [moveFrom, effectivePlayerColor, isMyTurn, game, makeMove, room?.status]);
 
   // Debug logging
   useEffect(() => {
@@ -74,23 +83,32 @@ const GameRoom = () => {
 
   const handleSquareClick = useCallback((square) => {
     const state = stateRef.current;
+    // Lock ALL interaction until a second player has joined
+    if (state.isWaiting) return;
+
+    const currentGame = state.game;
+    const myColor = state.playerColor;
     
+    // --- PHASE 1: No piece selected yet ---
     if (!state.moveFrom) {
-      const piece = state.game.get(square);
-      // Check if it's a piece of the player's color and it's their turn
-      if (piece && piece.color === state.playerColor && state.isMyTurn) {
-        setMoveFrom(square);
-        getMoveOptions(square, state.game);
+      const piece = currentGame.get(square);
+      if (piece && piece.color === currentGame.turn()) {
+        if (!myColor || piece.color === myColor) {
+          setMoveFrom(square);
+          getMoveOptions(square, currentGame);
+        }
       }
       return;
     }
 
+    // --- PHASE 2: A piece is already selected — try to move ---
     try {
-      const testGame = new Chess(state.game.fen());
+      const testGame = new Chess(currentGame.fen());
       const moveResult = testGame.move({ from: state.moveFrom, to: square, promotion: 'q' });
-      
       if (moveResult) {
-        state.makeMove({ from: state.moveFrom, to: square, promotion: 'q' });
+        if (state.isMyTurn) {
+          state.makeMove({ from: state.moveFrom, to: square, promotion: 'q' });
+        }
         setMoveFrom('');
         setOptionSquares({});
         return;
@@ -99,28 +117,43 @@ const GameRoom = () => {
       console.warn('Move validation error:', e.message);
     }
 
-    // If we click another piece of our color, select it instead
-    const piece = state.game.get(square);
-    if (piece && piece.color === state.playerColor && state.isMyTurn) {
+    // --- PHASE 3: Re-select another own piece ---
+    const piece = currentGame.get(square);
+    if (piece && piece.color === currentGame.turn() && (!myColor || piece.color === myColor)) {
       setMoveFrom(square);
-      getMoveOptions(square, state.game);
+      getMoveOptions(square, currentGame);
     } else {
       setMoveFrom('');
       setOptionSquares({});
     }
-  }, []); // Depend on nothing as we use stateRef for everything
+  }, []);
+
+  const handlePieceClick = useCallback((piece, square) => {
+    const state = stateRef.current;
+    if (state.isWaiting) return; // locked until opponent joins
+
+    const currentGame = state.game;
+    const myColor = state.playerColor;
+    const pieceColor = piece[0] === 'w' ? 'w' : 'b';
+
+    if (myColor && pieceColor !== myColor) return;
+    if (pieceColor !== currentGame.turn()) return;
+
+    setMoveFrom(square);
+    getMoveOptions(square, currentGame);
+  }, []);
 
   const handlePieceDrop = useCallback((sourceSquare, targetSquare) => {
     const state = stateRef.current;
-    
-    if (state.playerColor !== state.game.turn()) {
-      return false;
-    }
+    if (state.isWaiting) return false; // locked until opponent joins
+
+    const myColor = state.playerColor;
+    if (myColor && myColor !== state.game.turn()) return false;
+    if (!state.isMyTurn) return false;
 
     try {
       const testGame = new Chess(state.game.fen());
       const result = testGame.move({ from: sourceSquare, to: targetSquare, promotion: 'q' });
-      
       if (result) {
         state.makeMove({ from: sourceSquare, to: targetSquare, promotion: 'q' });
         setMoveFrom('');
@@ -171,7 +204,11 @@ const GameRoom = () => {
     <div className="game-container flex items-center justify-center">
       <div className="nm-card p-8 text-center animate-pulse">
         <h2 className="serif text-2xl mb-2">Sadhurangam</h2>
-        <p className="text-muted">Setting up the board...</p>
+        <p className="text-muted mb-4">Setting up the board...</p>
+        <div className="flex flex-col gap-2">
+          <button className="btn btn-ghost btn-sm" onClick={() => window.location.reload()}>Retry Load</button>
+          <button className="btn btn-outline btn-sm" onClick={() => navigate('/lobby')}>Back to Lobby</button>
+        </div>
       </div>
     </div>
   );
@@ -199,22 +236,42 @@ const GameRoom = () => {
         <div className="board-section">
           {/* Opponent Info */}
           <PlayerBar 
-            player={playerColor === 'w' ? room?.black_player : room?.white_player}
-            time={playerColor === 'w' ? (timers?.black ?? 600) : (timers?.white ?? 600)}
-            isTurn={game && typeof game.turn === 'function' && game.turn() === (playerColor === 'w' ? 'b' : 'w')}
-            captured={playerColor === 'w' ? (captured?.white ?? []) : (captured?.black ?? [])}
-            color={playerColor === 'w' ? 'black' : 'white'}
+            player={effectivePlayerColor === 'w' ? room?.black_player : room?.white_player}
+            time={effectivePlayerColor === 'w' ? (timers?.black ?? 600) : (timers?.white ?? 600)}
+            isTurn={game && typeof game.turn === 'function' && game.turn() === (effectivePlayerColor === 'w' ? 'b' : 'w')}
+            captured={effectivePlayerColor === 'w' ? (captured?.white ?? []) : (captured?.black ?? [])}
+            color={effectivePlayerColor === 'w' ? 'black' : 'white'}
           />
 
-          <div className="chessboard-wrapper nm-card">
+          <div className="chessboard-wrapper nm-card" style={{position: 'relative'}}>
+            {/* Waiting overlay — blocks board until opponent joins */}
+            {room?.status === 'waiting' && (
+              <div className="waiting-banner">
+                <div className="waiting-pulse" />
+                <h3>Waiting for Opponent</h3>
+                <p>Share this room code with a friend to start the game</p>
+                <div className="room-code-badge">
+                  {roomCode}
+                  <button 
+                    onClick={copyRoomCode} 
+                    style={{background:'none',border:'none',cursor:'pointer',color:'inherit',padding:0,display:'flex'}}
+                    title="Copy room code"
+                  >
+                    <Copy size={16} />
+                  </button>
+                </div>
+                <p style={{fontSize:'12px',marginTop:4}}>Moves are locked until the match begins</p>
+              </div>
+            )}
             {game && typeof game.fen === 'function' && (
               <Chessboard 
                 id="main-board"
                 position={game.fen()} 
                 onPieceDrop={handlePieceDrop}
                 onSquareClick={handleSquareClick}
-                boardOrientation={playerColor === 'b' ? 'black' : 'white'}
-                arePiecesDraggable={true}
+                onPieceClick={handlePieceClick}
+                boardOrientation={effectivePlayerColor === 'b' ? 'black' : 'white'}
+                arePiecesDraggable={room?.status === 'active'}
                 customDarkSquareStyle={customDarkSquareStyle}
                 customLightSquareStyle={customLightSquareStyle}
                 customSquareStyles={optionSquares}
@@ -225,11 +282,11 @@ const GameRoom = () => {
 
           {/* Player Info */}
           <PlayerBar 
-            player={profile}
-            time={playerColor === 'w' ? (timers?.white ?? 600) : (timers?.black ?? 600)}
+            player={profile || { display_name: user?.email, avatar_initials: '??' }}
+            time={effectivePlayerColor === 'w' ? (timers?.white ?? 600) : (timers?.black ?? 600)}
             isTurn={isMyTurn}
-            captured={playerColor === 'w' ? (captured?.black ?? []) : (captured?.white ?? [])}
-            color={playerColor === 'w' ? 'white' : 'black'}
+            captured={effectivePlayerColor === 'w' ? (captured?.black ?? []) : (captured?.white ?? [])}
+            color={effectivePlayerColor === 'w' ? 'white' : 'black'}
             isSelf={true}
           />
         </div>

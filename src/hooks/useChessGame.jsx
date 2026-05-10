@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Chess } from 'chess.js';
 import { supabase } from '../lib/supabase';
 
-export const useChessGame = (roomCode, userProfile) => {
+export const useChessGame = (roomCode, userProfile, user) => {
   const [game, setGame] = useState(new Chess());
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -62,7 +62,13 @@ export const useChessGame = (roomCode, userProfile) => {
       }
       
       setRoom(data);
-      const initialGame = new Chess(data.fen || undefined);
+      let initialGame;
+      try {
+        initialGame = new Chess(data.fen || undefined);
+      } catch (e) {
+        console.error('Invalid FEN in room:', data.fen);
+        initialGame = new Chess();
+      }
       setGame(initialGame);
       setTimers({ 
         white: data.white_time_remaining ?? 600, 
@@ -123,9 +129,13 @@ export const useChessGame = (roomCode, userProfile) => {
         
         if (newRoom.fen) {
           setGame(prevGame => {
-            if (!prevGame || typeof prevGame.fen !== 'function' || newRoom.fen !== prevGame.fen()) {
-              console.log('Syncing FEN from DB:', newRoom.fen);
-              return new Chess(newRoom.fen);
+            try {
+              if (!prevGame || typeof prevGame.fen !== 'function' || newRoom.fen !== prevGame.fen()) {
+                console.log('Syncing FEN from DB:', newRoom.fen);
+                return new Chess(newRoom.fen);
+              }
+            } catch (err) {
+              console.error('Failed to sync FEN from DB:', err, newRoom.fen);
             }
             return prevGame;
           });
@@ -139,7 +149,8 @@ export const useChessGame = (roomCode, userProfile) => {
       .on('broadcast', { event: 'move' }, ({ payload }) => {
         console.log('Broadcast Move Received:', payload);
         const { move, senderId } = payload;
-        if (senderId === userProfile?.id) return;
+        const myId = userProfile?.id || user?.id;
+        if (senderId === myId) return;
 
         setGame(prevGame => {
           const gameCopy = new Chess(prevGame.fen());
@@ -162,7 +173,7 @@ export const useChessGame = (roomCode, userProfile) => {
       console.log('Unsubscribing from channel:', channelId);
       supabase.removeChannel(channel);
     };
-  }, [roomCode, userProfile?.id]);
+  }, [roomCode, userProfile?.id, user?.id]);
 
   // Timers
   useEffect(() => {
@@ -188,39 +199,63 @@ export const useChessGame = (roomCode, userProfile) => {
 
   // Player Color & Turn logic
   useEffect(() => {
-    if (!room || !userProfile) {
-      console.log('Player assignment skipped: room or profile missing');
+    // We need either a profile or a user to identify the player
+    const effectiveUser = userProfile || user;
+    
+    if (!room) {
+      console.log('Player assignment delayed: room missing');
+      return;
+    }
+
+    // If we don't have an identity yet, default to white if we created the room
+    // This allows dots to show immediately
+    if (!effectiveUser) {
+      console.log('No user identity yet, defaulting to white');
+      setPlayerColor('w');
+      setIsMyTurn(game.turn() === 'w');
       return;
     }
     
     let myColor = null;
-    if (room.white_player_id === userProfile.id) {
+    const myId = effectiveUser.id;
+
+    console.log('Identity Debug:', {
+      myId,
+      roomWhiteId: room.white_player_id,
+      roomBlackId: room.black_player_id
+    });
+
+    if (room.white_player_id === myId) {
       myColor = 'w';
-    } else if (room.black_player_id === userProfile.id) {
+    } else if (room.black_player_id === myId) {
       myColor = 'b';
     }
     
-    console.log('Player Identity Check:', {
-      myId: userProfile.id,
-      whiteId: room.white_player_id,
-      blackId: room.black_player_id,
-      assignedColor: myColor
-    });
-
     setPlayerColor(myColor);
     const turn = game.turn();
-    setIsMyTurn(myColor === turn);
+    // isMyTurn: true if our color matches the game turn
+    // In a waiting room with 1 player, we allow local play (isMyTurn mirrors game turn for our color)
+    setIsMyTurn(myColor !== null ? myColor === turn : false);
     
     setMoveHistory(game.history({ verbose: true }));
     updateCaptured(game);
-  }, [room, game, userProfile?.id, updateCaptured]);
+  }, [room, game, userProfile?.id, user?.id, updateCaptured]);
 
   const makeMove = useCallback(async (move) => {
     if (room?.status === 'finished') return false;
     
     const turn = game.turn();
-    if (playerColor !== turn) {
-      console.log('Not your turn!', { playerColor, turn });
+    // Compute effective color at call time to handle cases where state hasn't updated yet
+    const effectiveUser = userProfile || user;
+    const myId = effectiveUser?.id;
+    const effectiveColor = playerColor || (
+      myId && room?.white_player_id === myId ? 'w' :
+      myId && room?.black_player_id === myId ? 'b' :
+      null
+    );
+
+    if (effectiveColor !== null && effectiveColor !== turn) {
+      console.log('Not your turn!', { effectiveColor, turn });
       return false;
     }
 
@@ -238,11 +273,11 @@ export const useChessGame = (roomCode, userProfile) => {
           channelRef.current.send({
             type: 'broadcast',
             event: 'move',
-            payload: { move, senderId: userProfile.id }
+            payload: { move, senderId: myId }
           });
         }
 
-        // 3. Update Supabase Database
+        // 3. Update Supabase Database (only if room is active or has 2 players)
         const isGameOver = gameCopy.isGameOver();
         let status = room.status;
         let winnerId = null;
@@ -252,9 +287,8 @@ export const useChessGame = (roomCode, userProfile) => {
           if (gameCopy.isCheckmate()) {
             winnerId = gameCopy.turn() === 'w' ? room.black_player_id : room.white_player_id;
           }
-        } else if (status === 'waiting') {
-          status = 'active'; // Should already be active if two players joined, but just in case
         }
+        // Don't auto-change 'waiting' to 'active' here — that should happen via join
 
         const { error: updateError } = await supabase
           .from('rooms')
@@ -269,16 +303,21 @@ export const useChessGame = (roomCode, userProfile) => {
           .eq('id', room.id);
 
         if (updateError) {
-          console.error('DB Update Error:', updateError);
+          console.warn('DB Update failed (may be RLS if waiting room):', updateError.message);
         }
 
-        // 4. Record move in history table
-        await supabase.from('moves').insert([{
-          room_id: room.id,
-          player_id: userProfile.id,
-          move_san: result.san,
-          fen_after: gameCopy.fen()
-        }]);
+        // 4. Record move in history table (only for active rooms with 2 players)
+        if (room.status === 'active' && room.black_player_id) {
+          const { error: moveError } = await supabase.from('moves').insert([{
+            room_id: room.id,
+            player_id: myId,
+            move_san: result.san,
+            fen_after: gameCopy.fen()
+          }]);
+          if (moveError) {
+            console.warn('Move insert failed:', moveError.message);
+          }
+        }
 
         return true;
       }
@@ -286,13 +325,13 @@ export const useChessGame = (roomCode, userProfile) => {
       console.error('Move error:', err);
     }
     return false;
-  }, [room, game, playerColor, userProfile?.id, timers]);
+  }, [room, game, playerColor, userProfile, user, timers]);
 
   const sendEmoji = (emoji) => {
     supabase.channel(`room:${roomCode}`).send({
       type: 'broadcast',
       event: 'emoji',
-      payload: { emoji, senderId: userProfile.id }
+      payload: { emoji, senderId: userProfile?.id || user?.id }
     });
   };
 
@@ -307,7 +346,7 @@ export const useChessGame = (roomCode, userProfile) => {
   const requestRematch = async () => {
     await supabase
       .from('rooms')
-      .update({ rematch_offered_by: userProfile.id })
+      .update({ rematch_offered_by: userProfile?.id || user?.id })
       .eq('id', room.id);
   };
 
