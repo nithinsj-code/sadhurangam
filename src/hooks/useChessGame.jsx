@@ -205,6 +205,9 @@ export const useChessGame = (roomCode, userProfile, user) => {
       .on('broadcast', { event: 'emoji' }, ({ payload }) => {
         window.dispatchEvent(new CustomEvent('chess-emoji', { detail: payload }));
       })
+      .on('broadcast', { event: 'rematch_accepted' }, ({ payload }) => {
+        window.dispatchEvent(new CustomEvent('chess-rematch', { detail: payload }));
+      })
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -471,13 +474,21 @@ export const useChessGame = (roomCode, userProfile, user) => {
       .single();
 
     if (newRoom) {
-      // Broadcast new room code or navigate both?
-      // For simplicity, we just broadcast the code via the old room channel
-      supabase.channel(`room:${roomCode}`).send({
-        type: 'broadcast',
-        event: 'rematch_accepted',
-        payload: { newCode: code }
-      });
+      // Broadcast new room code via the existing channel
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'rematch_accepted',
+          payload: { newCode: code }
+        });
+      } else {
+        // Fallback if ref is missing
+        supabase.channel(`room:${roomCode}`).send({
+          type: 'broadcast',
+          event: 'rematch_accepted',
+          payload: { newCode: code }
+        });
+      }
     }
   };
 

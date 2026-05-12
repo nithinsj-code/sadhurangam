@@ -173,20 +173,16 @@ const GameRoom = () => {
       setTimeout(() => setEmojiMessage(null), 3000);
     };
 
+    const handleRematch = (e) => {
+      navigate(`/game/${e.detail.newCode}`);
+    };
+    
     window.addEventListener('chess-emoji', handleEmoji);
-    
-    const channelId = `rematch:${roomCode}`;
-    const channel = supabase.channel(channelId);
-    
-    channel
-      .on('broadcast', { event: 'rematch_accepted' }, ({ payload }) => {
-        navigate(`/game/${payload.newCode}`);
-      })
-      .subscribe();
+    window.addEventListener('chess-rematch', handleRematch);
 
     return () => {
       window.removeEventListener('chess-emoji', handleEmoji);
-      supabase.removeChannel(channel);
+      window.removeEventListener('chess-rematch', handleRematch);
     };
   }, [roomCode, navigate]);
 
