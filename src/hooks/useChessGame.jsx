@@ -481,14 +481,10 @@ export const useChessGame = (roomCode, userProfile, user) => {
           event: 'rematch_accepted',
           payload: { newCode: code }
         });
-      } else {
-        // Fallback if ref is missing
-        supabase.channel(`room:${roomCode}`).send({
-          type: 'broadcast',
-          event: 'rematch_accepted',
-          payload: { newCode: code }
-        });
       }
+      
+      // Also navigate the person who clicked accept!
+      window.dispatchEvent(new CustomEvent('chess-rematch', { detail: { newCode: code } }));
     }
   };
 

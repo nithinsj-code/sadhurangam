@@ -106,24 +106,40 @@ const Lobby = () => {
             <Plus size={22} /> Create New Room
           </button>
           
-          <div className="separator text-muted text-center py-2">
-            <span style={{ padding: '0 15px', background: 'var(--bg-soft)', position: 'relative', zIndex: 1 }}>OR</span>
-            <hr style={{ marginTop: '-12px', borderColor: 'rgba(255,255,255,0.05)' }} />
+          <div className="separator text-muted text-center py-4 relative">
+            <hr style={{ borderColor: 'rgba(255,255,255,0.1)', margin: '0' }} />
+            <span style={{ 
+              position: 'absolute', 
+              top: '50%', 
+              left: '50%', 
+              transform: 'translate(-50%, -50%)',
+              padding: '0 20px', 
+              background: 'var(--bg-soft)',
+              fontSize: '12px',
+              fontWeight: '700',
+              letterSpacing: '2px'
+            }}>OR</span>
           </div>
           
-          <form onSubmit={handleJoinRoom} className="join-form">
-            <div className="flex flex-col gap-3">
-              <label className="text-xs text-muted uppercase block text-center">Join Existing Room</label>
-              <div className="input-with-btn flex gap-2">
+          <form onSubmit={handleJoinRoom} className="join-form mt-2">
+            <div className="flex flex-col gap-4">
+              <label className="text-xs text-muted uppercase block text-center font-semibold">Join Existing Room</label>
+              <div className="flex gap-2">
                 <input 
                   type="text" 
-                  className="input" 
+                  className="input flex-1" 
                   placeholder="ROOM CODE"
                   value={roomCode}
                   onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                  style={{ textTransform: 'uppercase', letterSpacing: '2px', textAlign: 'center', fontWeight: '700' }}
+                  style={{ 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '4px', 
+                    textAlign: 'center', 
+                    fontWeight: '700',
+                    fontSize: '18px'
+                  }}
                 />
-                <button type="submit" className="btn btn-outline" style={{ padding: '0 25px' }}>Join</button>
+                <button type="submit" className="btn btn-outline" style={{ padding: '0 25px', minWidth: '100px' }}>Join</button>
               </div>
             </div>
           </form>
