@@ -44,7 +44,7 @@ export const useChessGame = (roomCode, userProfile, user) => {
   const fetchRoom = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data: roomData, error: roomError } = await supabase
         .from('rooms')
         .select(`
           *,
@@ -54,25 +54,44 @@ export const useChessGame = (roomCode, userProfile, user) => {
         .eq('code', roomCode)
         .maybeSingle();
 
-      if (error) throw error;
-      if (!data) {
+      if (roomError) throw roomError;
+      if (!roomData) {
         setError('Room not found');
         setLoading(false);
         return;
       }
       
-      setRoom(data);
-      let initialGame;
-      try {
-        initialGame = new Chess(data.fen || undefined);
-      } catch (e) {
-        console.error('Invalid FEN in room:', data.fen);
-        initialGame = new Chess();
+      setRoom(roomData);
+      
+      // Fetch Move History
+      const { data: movesData } = await supabase
+        .from('moves')
+        .select('*')
+        .eq('room_id', roomData.id)
+        .order('created_at', { ascending: true });
+
+      const initialGame = new Chess();
+      if (movesData && movesData.length > 0) {
+        movesData.forEach(m => {
+          try {
+            initialGame.move(m.move_san);
+          } catch (e) {
+            console.error('Error replaying move:', m.move_san, e);
+          }
+        });
+        setMoveHistory(initialGame.history({ verbose: true }));
+      } else if (roomData.fen) {
+        try {
+          initialGame.load(roomData.fen);
+        } catch (e) {
+          console.error('Invalid FEN:', roomData.fen);
+        }
       }
+
       setGame(initialGame);
       setTimers({ 
-        white: data.white_time_remaining ?? 600, 
-        black: data.black_time_remaining ?? 600 
+        white: roomData.white_time_remaining ?? 600, 
+        black: roomData.black_time_remaining ?? 600 
       });
       
       setLoading(false);
@@ -124,15 +143,30 @@ export const useChessGame = (roomCode, userProfile, user) => {
         
         console.log('Realtime Update Received:', newRoom.status);
         
-        // Merge the new data safely
-        setRoom(prev => prev ? { ...prev, ...newRoom } : newRoom);
+        setRoom(prev => {
+          // If a player joined (ID changed from null to value), we need to re-fetch to get profile details
+          const whiteJoined = !prev?.white_player_id && newRoom.white_player_id;
+          const blackJoined = !prev?.black_player_id && newRoom.black_player_id;
+          
+          if (whiteJoined || blackJoined) {
+            console.log('Player joined! Refreshing room details...');
+            fetchRoom();
+          }
+          
+          return prev ? { ...prev, ...newRoom } : newRoom;
+        });
         
         if (newRoom.fen) {
           setGame(prevGame => {
             try {
               if (!prevGame || typeof prevGame.fen !== 'function' || newRoom.fen !== prevGame.fen()) {
                 console.log('Syncing FEN from DB:', newRoom.fen);
-                return new Chess(newRoom.fen);
+                // If the FEN changed, it means we missed a move or it's a sync.
+                // We should NOT overwrite moveHistory here unless we have the full history.
+                // For now, we just update the game state. 
+                // To keep history synced, we'd ideally fetch moves again, but let's try to be less destructive.
+                const gameCopy = new Chess(newRoom.fen);
+                return gameCopy;
               }
             } catch (err) {
               console.error('Failed to sync FEN from DB:', err, newRoom.fen);
@@ -157,6 +191,12 @@ export const useChessGame = (roomCode, userProfile, user) => {
           const result = gameCopy.move(move);
           if (result) {
             console.log('Applied broadcast move');
+            // Append to history if it's not already the last move
+            setMoveHistory(prev => {
+              const lastMove = prev[prev.length - 1];
+              if (lastMove && lastMove.after === gameCopy.fen()) return prev;
+              return [...prev, result];
+            });
             return gameCopy;
           }
           return prevGame;
@@ -164,6 +204,35 @@ export const useChessGame = (roomCode, userProfile, user) => {
       })
       .on('broadcast', { event: 'emoji' }, ({ payload }) => {
         window.dispatchEvent(new CustomEvent('chess-emoji', { detail: payload }));
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'moves'
+      }, (payload) => {
+        const newMove = payload.new;
+        // Filter by room_id in JS because room.id might not be available at subscription time
+        // and using a Ref for room is more complex here.
+        setRoom(currentRoom => {
+          if (currentRoom && newMove.room_id === currentRoom.id) {
+            setMoveHistory(prev => {
+              // Avoid duplicates
+              if (prev.find(m => m.after === newMove.fen_after)) return prev;
+              
+              // We need the verbose move object. 
+              // Since we only have SAN from the DB, we can derive it or just store SAN.
+              // But GameRoom expects the verbose object.
+              // Let's create a partial verbose object that matches what the UI needs.
+              const partialMove = {
+                san: newMove.move_san,
+                after: newMove.fen_after,
+                color: prev.length % 2 === 0 ? 'w' : 'b'
+              };
+              return [...prev, partialMove];
+            });
+          }
+          return currentRoom;
+        });
       })
       .subscribe((status) => {
         console.log('Supabase Subscription Status:', status);
@@ -233,12 +302,9 @@ export const useChessGame = (roomCode, userProfile, user) => {
     
     setPlayerColor(myColor);
     const turn = game.turn();
-    // isMyTurn: true if our color matches the game turn
-    // In a waiting room with 1 player, we allow local play (isMyTurn mirrors game turn for our color)
     setIsMyTurn(myColor !== null ? myColor === turn : false);
     
-    setMoveHistory(game.history({ verbose: true }));
-    updateCaptured(game);
+    // updateCaptured(game);
   }, [room, game, userProfile?.id, user?.id, updateCaptured]);
 
   const makeMove = useCallback(async (move) => {
@@ -266,6 +332,12 @@ export const useChessGame = (roomCode, userProfile, user) => {
       if (result) {
         // 1. Update local state immediately for responsiveness
         setGame(gameCopy);
+        setMoveHistory(prev => {
+          const lastMove = prev[prev.length - 1];
+          if (lastMove && lastMove.after === gameCopy.fen()) return prev;
+          return [...prev, result];
+        });
+        updateCaptured(gameCopy);
         
         // 2. Broadcast the move immediately
         if (channelRef.current) {
@@ -336,10 +408,39 @@ export const useChessGame = (roomCode, userProfile, user) => {
   };
 
   const resign = async () => {
-    const winnerId = playerColor === 'w' ? room.black_player_id : room.white_player_id;
+    if (!room) return;
+    const myId = userProfile?.id || user?.id;
+    const winnerId = room.white_player_id === myId ? room.black_player_id : room.white_player_id;
+    
     await supabase
       .from('rooms')
       .update({ status: 'finished', winner_id: winnerId })
+      .eq('id', room.id);
+  };
+
+  const offerDraw = async () => {
+    if (!room) return;
+    const myId = userProfile?.id || user?.id;
+    
+    await supabase
+      .from('rooms')
+      .update({ draw_offered_by: myId })
+      .eq('id', room.id);
+  };
+
+  const acceptDraw = async () => {
+    if (!room) return;
+    await supabase
+      .from('rooms')
+      .update({ status: 'finished', winner_id: null, draw_offered_by: null })
+      .eq('id', room.id);
+  };
+
+  const declineDraw = async () => {
+    if (!room) return;
+    await supabase
+      .from('rooms')
+      .update({ draw_offered_by: null })
       .eq('id', room.id);
   };
 
@@ -393,6 +494,9 @@ export const useChessGame = (roomCode, userProfile, user) => {
     makeMove,
     sendEmoji,
     resign,
+    offerDraw,
+    acceptDraw,
+    declineDraw,
     requestRematch,
     acceptRematch
   };

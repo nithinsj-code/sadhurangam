@@ -22,7 +22,7 @@ const GameRoom = () => {
   const {
     game, room, loading, error, playerColor, 
     timers, isMyTurn, moveHistory, captured,
-    makeMove, sendEmoji, resign, requestRematch, acceptRematch
+    makeMove, sendEmoji, resign, offerDraw, acceptDraw, declineDraw, requestRematch, acceptRematch
   } = useChessGame(roomCode, profile, user);
 
   // Compute effective player color — fallback to game turn color if hook hasn't resolved yet
@@ -337,10 +337,24 @@ const GameRoom = () => {
               <button className="btn btn-outline flex-1" onClick={resign}>
                 <Flag size={16} /> Resign
               </button>
-              <button className="btn btn-outline flex-1">
-                <RotateCcw size={16} /> Draw
+              <button 
+                className="btn btn-outline flex-1" 
+                onClick={offerDraw}
+                disabled={!!room?.draw_offered_by}
+              >
+                <RotateCcw size={16} /> {room?.draw_offered_by ? 'Draw Pending' : 'Draw'}
               </button>
             </div>
+            
+            {room?.draw_offered_by && room.draw_offered_by !== profile?.id && (
+              <div className="draw-offer-alert nm-flat animate-fade mt-4">
+                <p className="text-sm mb-2">Opponent offered a draw</p>
+                <div className="flex gap-2">
+                  <button className="btn btn-primary btn-sm flex-1" onClick={acceptDraw}>Accept</button>
+                  <button className="btn btn-outline btn-sm flex-1" onClick={declineDraw}>Decline</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -355,7 +369,9 @@ const GameRoom = () => {
             <Trophy size={64} className="text-accent mb-4 mx-auto" />
             <h2 className="serif text-3xl mb-2">Game Over</h2>
             <p className="text-xl mb-6">
-              {room.winner_id === profile.id ? 'You Won!' : 'Opponent Won'}
+              {room.winner_id ? (
+                room.winner_id === profile.id ? 'You Won!' : 'Opponent Won'
+              ) : 'Match Drawn'}
             </p>
             <div className="flex gap-4 justify-center">
               {room.rematch_offered_by && room.rematch_offered_by !== profile.id ? (

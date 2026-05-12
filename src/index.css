@@ -259,6 +259,15 @@ h1, h2, h3, h4 {
 .emoji-btn:hover { transform: scale(1.2); }
 .emoji-popup { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 80px; z-index: 10; pointer-events: none; text-shadow: 0 0 20px rgba(0,0,0,0.5); }
 
+.draw-offer-alert {
+  padding: 16px;
+  background: var(--bg-soft);
+  border: 1px solid var(--primary-glow);
+  border-radius: var(--radius-md);
+  margin-top: 15px;
+  text-align: center;
+}
+
 /* Overlays */
 .game-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
 .result-card { padding: 60px; max-width: 500px; }
