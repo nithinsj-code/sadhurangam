@@ -38,6 +38,37 @@ const GameRoom = () => {
   const customDarkSquareStyle = useMemo(() => ({ backgroundColor: 'var(--board-dark)' }), []);
   const customLightSquareStyle = useMemo(() => ({ backgroundColor: 'var(--board-light)' }), []);
 
+  const findKingSquare = useCallback((chess, color) => {
+    const board = chess.board();
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const square = board[r][c];
+        if (square && square.type === 'k' && square.color === color) {
+          return String.fromCharCode(97 + c) + (8 - r);
+        }
+      }
+    }
+    return null;
+  }, []);
+
+  const boardStyles = useMemo(() => {
+    const styles = { ...optionSquares };
+    
+    if (game.inCheck()) {
+      const kingSquare = findKingSquare(game, game.turn());
+      if (kingSquare) {
+        styles[kingSquare] = {
+          ...styles[kingSquare],
+          background: 'radial-gradient(circle, rgba(239, 68, 68, .5) 85%, transparent 85%)',
+          borderRadius: '50%',
+          boxShadow: 'inset 0 0 0 4px rgba(239, 68, 68, 0.8)'
+        };
+      }
+    }
+    
+    return styles;
+  }, [optionSquares, game, findKingSquare]);
+
   function getMoveOptions(square, currentGame) {
     const chessInstance = currentGame || game;
     const moves = chessInstance.moves({ square, verbose: true });
@@ -270,7 +301,7 @@ const GameRoom = () => {
                 arePiecesDraggable={room?.status === 'active'}
                 customDarkSquareStyle={customDarkSquareStyle}
                 customLightSquareStyle={customLightSquareStyle}
-                customSquareStyles={optionSquares}
+                customSquareStyles={boardStyles}
                 animationDuration={200}
               />
             )}

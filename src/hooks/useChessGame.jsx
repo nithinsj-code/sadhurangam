@@ -44,6 +44,9 @@ export const useChessGame = (roomCode, userProfile, user) => {
   const fetchRoom = useCallback(async () => {
     try {
       setLoading(true);
+      setMoveHistory([]);
+      setCaptured({ white: [], black: [] });
+
       const { data: roomData, error: roomError } = await supabase
         .from('rooms')
         .select(`
@@ -89,6 +92,8 @@ export const useChessGame = (roomCode, userProfile, user) => {
       }
 
       setGame(initialGame);
+      updateCaptured(initialGame);
+
       setTimers({ 
         white: roomData.white_time_remaining ?? 600, 
         black: roomData.black_time_remaining ?? 600 

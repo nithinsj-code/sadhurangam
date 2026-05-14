@@ -17,11 +17,10 @@ const LandingPage = () => {
               <span>Tamil Version of Chess by Nithin</span>
             </div>
             <h1 className="hero-title-v2 serif">
-              Sadhurangam: The <span className="text-gradient">Ultimate</span> Chess Experience
+              சதுரங்கம்: The <span className="text-gradient">Ultimate</span> Chess Experience
             </h1>
             <p className="hero-description">
-              Elevate your game with real-time multiplayer, stunning neumorphic design, and a community of masters. 
-              Battle friends or challenge the world in the game of kings.
+              தமிழில் வடிவமைக்கப்பட்ட modern chess platform. நண்பர்களுடன் விளையாடுங்கள், உலகளாவிய வீரர்களை சவால் செய்யுங்கள், மற்றும் உங்கள் strategy-யை அடுத்த நிலைக்கு கொண்டு செல்லுங்கள்
             </p>
             <div className="hero-cta">
               {user ? (
@@ -30,13 +29,13 @@ const LandingPage = () => {
                 </Link>
               ) : (
                 <Link to="/auth" className="btn btn-primary btn-xl">
-                  Get Started Free
+                  ஆட்டத்தை தொடங்கு
                 </Link>
               )}
             </div>
-            
+
           </div>
-          
+
           <div className="hero-visual">
             <div className="image-stack">
               <div className="image-blob"></div>
@@ -55,7 +54,7 @@ const LandingPage = () => {
               We've reimagined the classic game with modern tech and premium aesthetics.
             </p>
           </div>
-          
+
           <div className="features-grid-v2">
             <div className="feature-card-v2 nm-card">
               <div className="icon-box nm-inset">
@@ -64,7 +63,7 @@ const LandingPage = () => {
               <h3>Ultra Fast</h3>
               <p className="text-muted">Low latency real-time moves powered by Supabase Realtime.</p>
             </div>
-            
+
             <div className="feature-card-v2 nm-card">
               <div className="icon-box nm-inset">
                 <Users size={24} className="text-primary" />
@@ -72,7 +71,7 @@ const LandingPage = () => {
               <h3>Play Anywhere</h3>
               <p className="text-muted">Challenge friends across devices with a fully responsive interface.</p>
             </div>
-            
+
             <div className="feature-card-v2 nm-card">
               <div className="icon-box nm-inset">
                 <Shield size={24} className="text-primary" />

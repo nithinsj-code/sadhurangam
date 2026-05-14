@@ -42,9 +42,9 @@ const AuthPage = () => {
     <div className="auth-container animate-fade">
       <div className="auth-card nm-card">
         <div className="auth-header">
-          <h2 className="serif">{isLogin ? 'Welcome Back' : 'Join Sadhurangam'}</h2>
+          <h2 className="serif">{isLogin ? 'வீரரே, மீண்டும் வரவேற்கிறோம்' : 'சதுரங்கத்தில் இணையுங்கள்'}</h2>
           <p className="text-muted">
-            {isLogin ? 'Sign in to continue your journey' : 'Create an account to start playing'}
+            {isLogin ? 'உங்கள் பயணத்தை தொடர உள்நுழையுங்கள்' : 'ஆட்டத்தை தொடங்க ஒரு கணக்கை உருவாக்கவும்'}
           </p>
         </div>
 
@@ -58,10 +58,10 @@ const AuthPage = () => {
                 <input
                   type="text"
                   className="input"
-                  placeholder="e.g. Magnus Carlsen"
+                  placeholder="e.g. Nithin"
                   required
                   value={formData.displayName}
-                  onChange={(e) => setFormData({...formData, displayName: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
                 />
               </div>
               <div className="input-group">
@@ -69,10 +69,10 @@ const AuthPage = () => {
                 <input
                   type="text"
                   className="input"
-                  placeholder="e.g. magnus_90"
+                  placeholder="e.g. nithin_90"
                   required
                   value={formData.username}
-                  onChange={(e) => setFormData({...formData, username: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 />
               </div>
             </>
@@ -86,7 +86,7 @@ const AuthPage = () => {
               placeholder="name@example.com"
               required
               value={formData.email}
-              onChange={(e) => setFormData({...formData, email: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             />
           </div>
 
@@ -98,7 +98,7 @@ const AuthPage = () => {
               placeholder="••••••••"
               required
               value={formData.password}
-              onChange={(e) => setFormData({...formData, password: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
             />
           </div>
 
@@ -108,12 +108,12 @@ const AuthPage = () => {
         </form>
 
         <div className="auth-footer">
-          <button 
-            className="btn btn-ghost" 
-            style={{boxShadow: 'none', background: 'transparent'}}
+          <button
+            className="btn btn-ghost"
+            style={{ boxShadow: 'none', background: 'transparent' }}
             onClick={() => setIsLogin(!isLogin)}
           >
-            {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
+            {isLogin ? "கணக்கு இல்லையா? பதிவு செய்யுங்கள்" : "ஏற்கனவே கணக்கு உள்ளதா? உள்நுழையுங்கள்"}
           </button>
         </div>
       </div>
