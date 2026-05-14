@@ -410,3 +410,52 @@ h1, h2, h3, h4 {
   .hero-visual { margin-top: 60px; max-width: 600px; margin-left: auto; margin-right: auto; }
   .features-grid-v2 { grid-template-columns: 1fr; }
 }
+/* Promotion Overlay */
+.promotion-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 12, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  border-radius: var(--radius-lg);
+}
+
+.promotion-card {
+  padding: 24px;
+  width: 280px;
+}
+
+.promotion-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.promotion-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border: none;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.promotion-btn:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--nm-shadow-out);
+}
+
+.promotion-btn .piece-icon {
+  font-size: 32px;
+}
+
+.promotion-btn .piece-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}

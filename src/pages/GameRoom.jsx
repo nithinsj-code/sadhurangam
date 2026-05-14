@@ -16,8 +16,8 @@ const GameRoom = () => {
   const navigate = useNavigate();
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [emojiMessage, setEmojiMessage] = useState(null);
-  const [moveFrom, setMoveFrom] = useState('');
   const [optionSquares, setOptionSquares] = useState({});
+  const [pendingPromotion, setPendingPromotion] = useState(null);
 
   const {
     game, room, loading, error, playerColor, 
@@ -137,8 +137,16 @@ const GameRoom = () => {
       const testGame = new Chess(currentGame.fen());
       const moveResult = testGame.move({ from: state.moveFrom, to: square, promotion: 'q' });
       if (moveResult) {
-        if (state.isMyTurn) {
-          state.makeMove({ from: state.moveFrom, to: square, promotion: 'q' });
+        // Check if it's actually a promotion move
+        const moves = currentGame.moves({ square: state.moveFrom, verbose: true });
+        const isPromotion = moves.some(m => m.to === square && m.promotion);
+
+        if (isPromotion) {
+          setPendingPromotion({ from: state.moveFrom, to: square });
+        } else {
+          if (state.isMyTurn) {
+            state.makeMove({ from: state.moveFrom, to: square, promotion: 'q' });
+          }
         }
         setMoveFrom('');
         setOptionSquares({});
@@ -186,7 +194,14 @@ const GameRoom = () => {
       const testGame = new Chess(state.game.fen());
       const result = testGame.move({ from: sourceSquare, to: targetSquare, promotion: 'q' });
       if (result) {
-        state.makeMove({ from: sourceSquare, to: targetSquare, promotion: 'q' });
+        const moves = state.game.moves({ square: sourceSquare, verbose: true });
+        const isPromotion = moves.some(m => m.to === targetSquare && m.promotion);
+
+        if (isPromotion) {
+          setPendingPromotion({ from: sourceSquare, to: targetSquare });
+        } else {
+          state.makeMove({ from: sourceSquare, to: targetSquare, promotion: 'q' });
+        }
         setMoveFrom('');
         setOptionSquares({});
         return true;
@@ -256,7 +271,15 @@ const GameRoom = () => {
     alert('Room code copied!');
   };
 
+  const confirmPromotion = (pieceType) => {
+    if (pendingPromotion) {
+      makeMove({ ...pendingPromotion, promotion: pieceType });
+      setPendingPromotion(null);
+    }
+  };
+
   return (
+
     <div className="game-container animate-fade">
       <div className="game-layout">
         {/* Main Board Area */}
@@ -304,6 +327,33 @@ const GameRoom = () => {
                 customSquareStyles={boardStyles}
                 animationDuration={200}
               />
+            )}
+
+            {/* Promotion Modal Overlay */}
+            {pendingPromotion && (
+              <div className="promotion-overlay animate-fade">
+                <div className="promotion-card nm-card">
+                  <h4 className="text-center mb-4 uppercase text-xs tracking-wider">Promote To</h4>
+                  <div className="promotion-options">
+                    {[
+                      { type: 'q', label: 'Queen' },
+                      { type: 'r', label: 'Rook' },
+                      { type: 'b', label: 'Bishop' },
+                      { type: 'n', label: 'Knight' }
+                    ].map((p) => (
+                      <button 
+                        key={p.type} 
+                        className="promotion-btn nm-flat"
+                        onClick={() => confirmPromotion(p.type)}
+                      >
+                        <span className="piece-icon">{getPieceIcon(p.type, effectivePlayerColor)}</span>
+                        <span className="piece-label">{p.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button className="btn btn-ghost btn-sm w-full mt-4" onClick={() => setPendingPromotion(null)}>Cancel</button>
+                </div>
+              </div>
             )}
           </div>
 
