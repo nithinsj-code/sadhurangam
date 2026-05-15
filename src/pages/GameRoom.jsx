@@ -17,6 +17,7 @@ const GameRoom = () => {
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [emojiMessage, setEmojiMessage] = useState(null);
   const [optionSquares, setOptionSquares] = useState({});
+  const [moveFrom, setMoveFrom] = useState('');
   const [pendingPromotion, setPendingPromotion] = useState(null);
 
   const {
